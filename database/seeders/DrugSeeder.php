@@ -25,6 +25,12 @@ class DrugSeeder extends Seeder
             ['OB013', 'ORS (Oral Rehydration Salt)', 'ORS', 'Ramuan', ' sachet', 'Sachet', 3500, 4000, 500],
             ['OB014', 'Vitamin C', 'Ascorbic Acid', 'Tablet', '500 mg', 'Tablet', 1000, 7000, 700],
             ['OB015', 'Calcium Carbonate', 'Calcium Carbonate', 'Tablet', '500 mg', 'Tablet', 1300, 4500, 450],
+
+            // Daftar di bawah sengaja dibuat menipis / mendekati habis agar
+            // indikator "Stok Menipis" dan "Stok Habis" pada modul farmasi
+            // dapat diuji dengan data yang nyata, bukan angka dummy.
+            ['OB016', 'Salbutamol Tablet', 'Salbutamol', 'Tablet', '2 mg', 'Tablet', 4500, 18, 50],
+            ['OB017', 'Metoclopramide Injeksi', 'Metoclopramide', 'Injeksi', '5 mg/ml', 'Vial', 28000, 0, 10],
         ];
 
         foreach ($drugs as [$code, $name, $generic, $form, $strength, $unit, $price, $stock, $minStock]) {

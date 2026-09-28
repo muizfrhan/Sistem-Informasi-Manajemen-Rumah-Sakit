@@ -3,14 +3,12 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Enums\Permission;
-use App\Enums\RoleCode;
 use App\Http\Controllers\Controller;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -93,11 +91,11 @@ class UserController extends Controller
             ->with('success', "Pengguna {$user->name} berhasil diperbarui.");
     }
 
-    public function toggle(User $user): RedirectResponse
+    public function toggle(Request $request, User $user): RedirectResponse
     {
-        $this->denyUnless(auth()->user()->hasPermission(Permission::MANAGE_USER));
+        $this->denyUnless($request->user()->hasPermission(Permission::MANAGE_USER));
 
-        if ($user->is(self)) {
+        if ($user->is($request->user())) {
             return back()->with('error', 'Anda tidak dapat menonaktifkan akun sendiri.');
         }
 
@@ -107,11 +105,11 @@ class UserController extends Controller
         return back()->with('success', $user->is_active ? 'Akun diaktifkan.' : 'Akun dinonaktifkan.');
     }
 
-    public function destroy(User $user): RedirectResponse
+    public function destroy(Request $request, User $user): RedirectResponse
     {
-        $this->denyUnless(auth()->user()->hasPermission(Permission::MANAGE_USER));
+        $this->denyUnless($request->user()->hasPermission(Permission::MANAGE_USER));
 
-        if ($user->is(auth()->user())) {
+        if ($user->is($request->user())) {
             return back()->with('error', 'Anda tidak dapat menghapus akun sendiri.');
         }
 

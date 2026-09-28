@@ -12,7 +12,9 @@ class RoleFactory extends Factory
     public function definition(): array
     {
         return [
-            'code' => $this->faker->unique()->slug(2),
+            // Prefix menjaga agar tidak bentrok dengan kode peran sistem
+            // (super_admin, receptionist, dan seterusnya).
+            'code' => 'test_'.$this->faker->unique()->slug(3),
             'name' => $this->faker->words(2, true),
             'description' => $this->faker->sentence(),
             'sort_order' => 0,

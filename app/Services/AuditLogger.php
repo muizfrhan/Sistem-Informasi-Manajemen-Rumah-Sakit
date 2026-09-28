@@ -89,11 +89,18 @@ class AuditLogger
     }
 
     /**
+     * Atribut yang boleh masuk audit trail.
+     *
+     * 'nik' wajib dikecualikan: kolom itu terenkripsi di tabel patients, tapi
+     * attributesToArray() menjalankan cast EncryptedNik yang mengembalikan NIK
+     * dalam bentuk plainly. Tanpa pengecualian ini, audit_logs akan menyimpan
+     * NIK pasien dalam bentuk yang bisa dibaca.
+     *
      * @return array<string, mixed>
      */
     protected function safeAttributes(Model $model): array
     {
-        $hidden = ['password', 'remember_token', 'nik_hash', 'payload', 'api_token'];
+        $hidden = ['password', 'remember_token', 'nik', 'nik_hash', 'payload', 'api_token'];
 
         return collect($model->attributesToArray())
             ->except($hidden)

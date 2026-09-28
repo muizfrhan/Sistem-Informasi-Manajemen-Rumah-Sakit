@@ -28,9 +28,9 @@ class PatientController extends Controller
             ->search($request->string('q')->toString())
             ->when($request->filled('insurance_type'), fn ($q) => $q->where('insurance_type', $request->string('insurance_type')))
             ->when($request->filled('status'), fn ($q) => $q->where('is_active', $request->string('status') === 'active'))
-            ->withCount('registrations')
-            ->latest('id')
-            ->paginate(20)
+            ->withCount(['registrations', 'medicalRecords', 'invoices', 'admissions'])
+            ->orderBy('name')
+            ->paginate((int) config('simrs.per_page', 20))
             ->withQueryString();
 
         return view('patients.index', [
@@ -71,12 +71,27 @@ class PatientController extends Controller
     {
         $this->denyUnless(auth()->user()->hasPermission(Permission::VIEW_PATIENT));
 
-        $patient->load(['creator', 'registrations.poly', 'registrations.doctor'])
-            ->loadCount('registrations');
+        $patient->load([
+            'creator',
+            'registrations' => fn ($q) => $q->with(['poly', 'doctor'])->latest('visit_date')->limit(20),
+            'medicalRecords' => fn ($q) => $q
+                ->with(['doctor', 'registration.poly', 'diagnoses.icd10Code'])
+                ->latest('created_at')
+                ->limit(20),
+            'prescriptions' => fn ($q) => $q->with(['doctor', 'items'])->latest('id')->limit(20),
+            'invoices' => fn ($q) => $q->latest('issued_at')->limit(20),
+            'admissions' => fn ($q) => $q->with('room')->latest('admitted_at')->limit(20),
+        ]);
+
+        $patient->loadCount(['registrations', 'medicalRecords', 'invoices', 'admissions']);
 
         $this->audit->viewed($patient::class, $patient->id);
 
-        return view('patients.show', ['patient' => $patient]);
+        return view('patients.show', [
+            'patient' => $patient,
+            'canRegister' => auth()->user()->hasPermission(Permission::MANAGE_REGISTRATION),
+            'canWriteEmr' => auth()->user()->hasPermission(Permission::MANAGE_EMR),
+        ]);
     }
 
     public function edit(Patient $patient): View

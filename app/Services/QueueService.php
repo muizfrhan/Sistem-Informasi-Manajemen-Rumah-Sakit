@@ -84,7 +84,7 @@ class QueueService
         $next = Registration::query()
             ->where('poly_id', $poly->id)
             ->whereDate('visit_date', today())
-            ->where('status', RegistrationStatus::QUEUING)
+            ->whereIn('status', [RegistrationStatus::QUEUING, RegistrationStatus::REGISTERED])
             ->when($doctor, fn ($q) => $q->where('doctor_id', $doctor->id))
             ->orderByRaw('is_emergency DESC')
             ->orderBy('queue_number')

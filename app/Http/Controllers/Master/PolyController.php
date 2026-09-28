@@ -18,8 +18,13 @@ class PolyController extends Controller
 
         $polies = Poly::query()
             ->withCount('doctors')
+            ->when($request->filled('q'), fn ($q) => $q->where(fn ($w) => $w
+                ->where('name', 'ILIKE', '%'.$request->string('q')->toString().'%')
+                ->orWhere('code', 'ILIKE', '%'.$request->string('q')->toString().'%')))
+            ->when($request->filled('status'), fn ($q) => $q->where('is_active', $request->string('status')->toString() === 'active'))
             ->orderBy('name')
-            ->paginate(25);
+            ->paginate(25)
+            ->withQueryString();
 
         return view('master.polies.index', [
             'polies' => $polies,

@@ -5,6 +5,8 @@ namespace App\Models;
 use App\Casts\EncryptedNik;
 use App\Enums\Gender;
 use App\Enums\InsuranceType;
+use Carbon\Carbon;
+use Database\Factories\PatientFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -14,7 +16,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Patient extends Model
 {
-    /** @use HasFactory<\Database\Factories\PatientFactory> */
+    /** @use HasFactory<PatientFactory> */
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
@@ -60,6 +62,26 @@ class Patient extends Model
         return $this->hasMany(Registration::class);
     }
 
+    public function medicalRecords(): HasMany
+    {
+        return $this->hasMany(MedicalRecord::class);
+    }
+
+    public function prescriptions(): HasMany
+    {
+        return $this->hasMany(Prescription::class);
+    }
+
+    public function invoices(): HasMany
+    {
+        return $this->hasMany(Invoice::class);
+    }
+
+    public function admissions(): HasMany
+    {
+        return $this->hasMany(InpatientAdmission::class);
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
@@ -94,7 +116,7 @@ class Patient extends Model
 
     public function getAgeAttribute(): int
     {
-        return (int) \Carbon\Carbon::parse($this->birth_date)->age;
+        return (int) Carbon::parse($this->birth_date)->age;
     }
 
     public function getAgeYearsAttribute(): string

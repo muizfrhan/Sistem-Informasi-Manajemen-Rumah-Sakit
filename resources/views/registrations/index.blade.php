@@ -1,89 +1,120 @@
 @extends('layouts.app')
 
 @section('title', 'Pendaftaran')
-@section('heading', 'Pendaftaran')
-@section('subheading', $registrations->total().' data pendaftaran')
+@section('heading', 'Data Pendaftaran')
+@section('subheading', $registrations->total() . ' kunjungan tercatat')
 
 @section('content')
-    <x-card padding="p-0">
-        <x-slot:title>Daftar Pendaftaran Pasien</x-slot:title>
-        <x-slot:subtitle>Riwayat pendaftaran seluruh poli</x-slot:subtitle>
-        <x-slot:actions>
-            @if (auth()->user()->hasPermission(\App\Enums\Permission::MANAGE_REGISTRATION))
-                <x-button :href="route('registrations.create')" size="sm">+ Pendaftaran Baru</x-button>
-            @endif
-        </x-slot:actions>
+    <div class="space-y-5">
+        <x-page-header title="Data Pendaftaran"
+                       :description="'Total ' . number_format($registrations->total(), 0, ',', '.') . ' kunjungan'">
+            <x-slot:actions>
+                <x-button :href="route('registrations.create')" icon="plus">Pendaftaran Baru</x-button>
+            </x-slot:actions>
+        </x-page-header>
 
-        <form method="GET" class="flex flex-wrap items-end gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4">
-            <div class="w-52">
-                <x-input name="date" type="date" :value="request('date')" :max="now()->format('Y-m-d')" />
-            </div>
-            <div class="w-56">
-                <x-select name="poly_id" :value="request('poly_id')"
-                          :options="$polies->pluck('name', 'id')->all()" placeholder="Semua poli" />
-            </div>
-            <div class="w-52">
-                <x-select name="status" :value="request('status')"
-                          :options="collect($statuses)->mapWithKeys(fn ($s) => [$s->value => $s->label()])->all()"
-                          placeholder="Semua status" />
-            </div>
-            <x-button type="submit" variant="secondary">Filter</x-button>
-            @if (request()->hasAny(['date', 'poly_id', 'status']))
-                <a href="{{ route('registrations.index') }}" class="pb-2 text-xs text-slate-500 hover:text-slate-700">Reset</a>
-            @endif
-        </form>
+        <x-card padding="p-0">
+            <x-filter-bar :action="route('registrations.index')" :reset="route('registrations.index')">
+                <x-slot:fields>
+                    <div>
+                        <label for="poly_id" class="field-label">Poli</label>
+                        <select id="poly_id" name="poly_id" class="field-control">
+                            <option value="">Semua poli</option>
+                            @foreach ($polies as $poly)
+                                <option value="{{ $poly->id }}" @selected(request('poly_id') == $poly->id)>
+                                    {{ $poly->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
 
-        @if ($registrations->isEmpty())
-            <x-empty-state title="Belum ada pendaftaran"
-                           message="Belum ada data yang sesuai filter. Coba ubah filter atau buat pendaftaran baru." />
-        @else
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-slate-200 text-sm">
-                    <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                    <div>
+                        <label for="status" class="field-label">Status</label>
+                        <select id="status" name="status" class="field-control">
+                            <option value="">Semua status</option>
+                            @foreach ($statuses as $status)
+                                <option value="{{ $status->value }}" @selected(request('status') === $status->value)>
+                                    {{ $status->label() }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div>
+                        <label for="date" class="field-label">Tanggal Kunjungan</label>
+                        <input id="date" name="date" type="date" value="{{ request('date') }}" class="field-control">
+                    </div>
+                </x-slot:fields>
+            </x-filter-bar>
+
+            <x-data-table :cols="$registrations->count()" min-width="56rem"
+                          empty="Belum ada pendaftaran"
+                          empty-message="Belum ada kunjungan yang cocok dengan filter ini."
+                          empty-icon="clipboard">
+                <x-slot:emptyAction>
+                    <x-button :href="route('registrations.index')" size="sm" variant="secondary" icon="refresh">Reset Filter</x-button>
+                </x-slot:emptyAction>
+
+                <x-slot:head>
+                    <tr>
+                        <th scope="col">Antrean</th>
+                        <th scope="col">Pasien</th>
+                        <th scope="col" class="hidden sm:table-cell">Poli</th>
+                        <th scope="col" class="hidden lg:table-cell">Dokter</th>
+                        <th scope="col" class="hidden xl:table-cell">Keluhan</th>
+                        <th scope="col" class="hidden md:table-cell">Tanggal</th>
+                        <th scope="col">Status</th>
+                    </tr>
+                </x-slot:head>
+
+                <x-slot:body>
+                    @foreach ($registrations as $registration)
                         <tr>
-                            <th class="px-5 py-3 font-medium">No. Registrasi</th>
-                            <th class="px-5 py-3 font-medium">Tanggal</th>
-                            <th class="px-5 py-3 font-medium">Antrean</th>
-                            <th class="px-5 py-3 font-medium">Pasien</th>
-                            <th class="px-5 py-3 font-medium">Poli / Dokter</th>
-                            <th class="px-5 py-3 font-medium">Status</th>
-                            <th class="px-5 py-3 text-right font-medium">Aksi</th>
+                            <td data-label="Antrean">
+                                <a href="{{ route('registrations.show', $registration) }}"
+                                   class="font-mono text-sm font-bold text-brand hover:underline">
+                                    {{ $registration->queue_code }}
+                                </a>
+                                @if ($registration->is_emergency)
+                                    <x-badge variant="danger" class="ml-1" title="Gawat darurat">UGD</x-badge>
+                                @endif
+                            </td>
+
+                            <td data-label="Pasien">
+                                <a href="{{ route('patients.show', $registration->patient) }}"
+                                   class="font-semibold text-ink hover:underline">
+                                    {{ $registration->patient->name }}
+                                </a>
+                                <span class="block font-mono text-xs text-ink-3">{{ $registration->patient->mr_number }}</span>
+                            </td>
+
+                            <td data-label="Poli" class="hidden sm:table-cell">{{ $registration->poly->name }}</td>
+
+                            <td data-label="Dokter" class="hidden lg:table-cell text-xs">
+                                {{ $registration->doctor?->name ?? '-' }}
+                            </td>
+
+                            <td data-label="Keluhan" class="hidden xl:table-cell">
+                                <span class="line-clamp-1 text-xs text-ink-2">{{ $registration->complaint ?: '-' }}</span>
+                            </td>
+
+                            <td data-label="Tanggal" class="hidden md:table-cell text-xs text-ink-2">
+                                {{ $registration->visit_date->translatedFormat('d M Y') }}
+                            </td>
+
+                            <td data-label="Status">
+                                <x-badge :class="$registration->status->badgeClass()">
+                                    {{ $registration->status->label() }}
+                                </x-badge>
+                            </td>
                         </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
-                        @foreach ($registrations as $registration)
-                            <tr class="hover:bg-slate-50">
-                                <td class="whitespace-nowrap px-5 py-3 font-mono text-xs font-semibold text-teal-700">
-                                    <a href="{{ route('registrations.show', $registration) }}" class="hover:underline">{{ $registration->registration_number }}</a>
-                                </td>
-                                <td class="whitespace-nowrap px-5 py-3 text-slate-600">{{ $registration->visit_date->translatedFormat('d M Y') }}</td>
-                                <td class="whitespace-nowrap px-5 py-3">
-                                    <span class="font-mono font-semibold text-slate-800">{{ $registration->queue_code }}</span>
-                                    @if ($registration->is_emergency)
-                                        <x-badge variant="red" class="ml-1">UGD</x-badge>
-                                    @endif
-                                </td>
-                                <td class="px-5 py-3">
-                                    <a href="{{ route('patients.show', $registration->patient) }}" class="font-medium text-slate-800 hover:underline">{{ $registration->patient->name }}</a>
-                                    <p class="font-mono text-xs text-slate-500">{{ $registration->patient->mr_number }}</p>
-                                </td>
-                                <td class="px-5 py-3">
-                                    <p class="text-slate-800">{{ $registration->poly->name }}</p>
-                                    <p class="text-xs text-slate-500">{{ $registration->doctor?->name ?? '-' }}</p>
-                                </td>
-                                <td class="whitespace-nowrap px-5 py-3"><x-badge :class="$registration->status->badgeClass()">{{ $registration->status->label() }}</x-badge></td>
-                                <td class="whitespace-nowrap px-5 py-3 text-right">
-                                    <a href="{{ route('registrations.show', $registration) }}" class="text-xs font-medium text-teal-700 hover:underline">Detail</a>
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
+                    @endforeach
+                </x-slot:body>
+            </x-data-table>
 
             @if ($registrations->hasPages())
-                <div class="border-t border-slate-200 px-5 py-3">{{ $registrations->links() }}</div>
+                {{ $registrations->links() }}
             @endif
-        @endif
-    </x-card>
+        </x-card>
+    </div>
 @endsection

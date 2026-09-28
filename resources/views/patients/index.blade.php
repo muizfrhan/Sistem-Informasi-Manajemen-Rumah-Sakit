@@ -4,93 +4,189 @@
 @section('heading', 'Data Pasien')
 @section('subheading', $patients->total().' pasien terdaftar')
 
+@php
+    // Empty state hanya menampilkan satu tombol, ditentukan di sini agar
+    // tidak ada kondisi Blade di dalam named slot (tidak didukung Blade).
+    $hasFilter = $search !== '' || request()->filled('insurance_type') || request()->filled('status');
+
+    $emptyCta = $hasFilter
+        ? ['label' => 'Reset Filter', 'href' => route('patients.index'), 'variant' => 'secondary', 'icon' => 'refresh', 'permission' => null]
+        : ['label' => 'Tambah Pasien', 'href' => route('patients.create'), 'variant' => 'primary', 'icon' => 'user-plus', 'permission' => 'patient.manage'];
+
+    // Dirakit di PHP karena tanda kutip di dalam nilai atribut komponen
+    // membuat Blade gagal mengompilasi tag <x-page-header>.
+    $pageDescription = 'Total '.number_format($patients->total(), 0, ',', '.').' pasien'
+        .($search !== '' ? ' untuk pencarian "'.$search.'"' : '');
+@endphp
+
 @section('content')
-    <x-card padding="p-0">
-        <x-slot:title>Kelola Data Pasien</x-slot:title>
-        <x-slot:subtitle>Cari berdasarkan No. RM, nama, NIK, atau nomor BPJS</x-slot:subtitle>
-        <x-slot:actions>
-            @if (auth()->user()->hasPermission(\App\Enums\Permission::MANAGE_PATIENT))
-                <x-button :href="route('patients.create')" size="sm">+ Pasien Baru</x-button>
-            @endif
-        </x-slot:actions>
+    <div class="space-y-5">
+        <x-page-header title="Data Pasien" :description="$pageDescription">
+            <x-slot:actions>
+                <x-button permission="patient.manage" :href="route('patients.create')" icon="user-plus">Pasien Baru</x-button>
+                <x-button :href="route('registrations.create')" variant="secondary" icon="clipboard">Pendaftaran</x-button>
+            </x-slot:actions>
+        </x-page-header>
 
-        <form method="GET" class="flex flex-wrap items-end gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4">
-            <div class="min-w-56 flex-1">
-                <x-input name="q" :value="$search" placeholder="Cari pasien..." class="bg-white" />
-            </div>
-            <div class="w-44">
-                <x-select name="insurance_type" :value="request('insurance_type')" :options="collect($insuranceTypes)->mapWithKeys(fn ($i) => [$i->value => $i->label()])->all()" placeholder="Semua jaminan" />
-            </div>
-            <div class="w-40">
-                <x-select name="status" :value="request('status')" :options="['active' => 'Aktif', 'inactive' => 'Nonaktif']" placeholder="Semua status" />
-            </div>
-            <x-button type="submit" variant="secondary" size="md">Filter</x-button>
-            @if (request()->hasAny(['q', 'insurance_type', 'status']))
-                <a href="{{ route('patients.index') }}" class="pb-2 text-xs text-slate-500 hover:text-slate-700">Reset</a>
-            @endif
-        </form>
+        <x-card padding="p-0">
+            <x-filter-bar :action="route('patients.index')" :reset="route('patients.index')">
+                <x-slot:fields>
+                    <div>
+                        <label for="q" class="field-label">Pencarian</label>
+                        <div class="relative">
+                            <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-ink-3">
+                                <x-icon name="search" class="h-4 w-4" />
+                            </span>
+                            <input id="q" name="q" type="search" value="{{ $search }}"
+                                   placeholder="No. RM, NIK, atau nama"
+                                   class="field-control pl-9">
+                        </div>
+                    </div>
 
-        @if ($patients->isEmpty())
-            <x-empty-state title="Tidak ada pasien ditemukan"
-                           message="Coba ubah kata kunci pencarian atau daftarkan pasien baru.">
-                @if (auth()->user()->hasPermission(\App\Enums\Permission::MANAGE_PATIENT))
-                    <x-button :href="route('patients.create')">+ Daftarkan Pasien</x-button>
-                @endif
-            </x-empty-state>
-        @else
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-slate-200 text-sm">
-                    <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                    <div>
+                        <label for="insurance_type" class="field-label">Jenis Asuransi</label>
+                        <select id="insurance_type" name="insurance_type" class="field-control">
+                            <option value="">Semua</option>
+                            @foreach ($insuranceTypes as $type)
+                                <option value="{{ $type->value }}"
+                                    @selected(request('insurance_type') === $type->value)>
+                                    {{ $type->label() }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div>
+                        <label for="status" class="field-label">Status</label>
+                        <select id="status" name="status" class="field-control">
+                            <option value="">Semua</option>
+                            <option value="active" @selected(request('status') === 'active')>Aktif</option>
+                            <option value="inactive" @selected(request('status') === 'inactive')>Nonaktif</option>
+                        </select>
+                    </div>
+                </x-slot:fields>
+
+                <x-slot:default>
+                    <span class="text-xs text-ink-3">
+                        Halaman {{ $patients->firstItem() ?? 0 }}&ndash;{{ $patients->lastItem() ?? 0 }}
+                    </span>
+                </x-slot:default>
+            </x-filter-bar>
+
+            <x-data-table :cols="$patients->count()" min-width="52rem"
+                          empty="Belum ada data pasien"
+                          empty-message="Belum ada pasien yang cocok dengan filter ini. Ubah pencarian atau tambahkan pasien baru."
+                          empty-icon="users">
+                <x-slot:emptyAction>
+                    <x-button :href="$emptyCta['href']" :variant="$emptyCta['variant']" size="sm"
+                              :icon="$emptyCta['icon']" :permission="$emptyCta['permission']">
+                        {{ $emptyCta['label'] }}
+                    </x-button>
+                </x-slot:emptyAction>
+
+                <x-slot:head>
+                    <tr>
+                        <th scope="col">No. RM</th>
+                        <th scope="col">Nama Pasien</th>
+                        <th scope="col" class="hidden md:table-cell">NIK</th>
+                        <th scope="col" class="hidden lg:table-cell">Asuransi</th>
+                        <th scope="col" class="hidden sm:table-cell">Jk / Usia</th>
+                        <th scope="col" class="hidden sm:table-cell">Kunjungan</th>
+                        <th scope="col">Status</th>
+                        <th scope="col" class="text-right">Aksi</th>
+                    </tr>
+                </x-slot:head>
+
+                <x-slot:body>
+                    @foreach ($patients as $patient)
                         <tr>
-                            <th class="px-5 py-3 font-medium">No. RM</th>
-                            <th class="px-5 py-3 font-medium">Nama Pasien</th>
-                            <th class="px-5 py-3 font-medium">NIK</th>
-                            <th class="px-5 py-3 font-medium">JK / Umur</th>
-                            <th class="px-5 py-3 font-medium">Jaminan</th>
-                            <th class="px-5 py-3 text-center font-medium">Kunjungan</th>
-                            <th class="px-5 py-3 font-medium">Status</th>
-                            <th class="px-5 py-3 text-right font-medium">Aksi</th>
+                            <td data-label="No. RM">
+                                <a href="{{ route('patients.show', $patient) }}"
+                                   class="font-mono text-xs font-bold text-brand hover:underline">
+                                    {{ $patient->mr_number }}
+                                </a>
+                            </td>
+
+                            <td data-label="Nama">
+                                <a href="{{ route('patients.show', $patient) }}"
+                                   class="font-semibold text-ink hover:underline">
+                                    {{ $patient->name }}
+                                </a>
+                                <span class="block text-xs text-ink-3 md:hidden">
+                                    {{ $patient->gender->label() }} &middot; {{ $patient->age }} th
+                                </span>
+                            </td>
+
+                            <td data-label="NIK" class="hidden md:table-cell">
+                                <span class="font-mono text-xs text-ink-2">{{ $patient->masked_nik }}</span>
+                            </td>
+
+                            <td data-label="Asuransi" class="hidden lg:table-cell">
+                                <x-badge :variant="$patient->insurance_type->value === 'NONE' ? 'slate' : 'info'">
+                                    {{ $patient->insurance_type->label() }}
+                                </x-badge>
+                            </td>
+
+                            <td data-label="Jk / Usia" class="hidden sm:table-cell text-xs text-ink-2">
+                                {{ $patient->gender->label() }} &middot; {{ $patient->age }} th
+                            </td>
+
+                            <td data-label="Kunjungan" class="hidden sm:table-cell">
+                                <span class="text-xs font-semibold text-ink-2 tabular-nums">
+                                    {{ $patient->registrations_count }}
+                                </span>
+                            </td>
+
+                            <td data-label="Status">
+                                <x-active-badge :active="$patient->is_active" />
+                            </td>
+
+                            <td data-label="Aksi">
+                                <div class="flex items-center justify-end gap-1">
+                                    <a href="{{ route('patients.show', $patient) }}" title="Lihat detail"
+                                       aria-label="Lihat detail {{ $patient->name }}"
+                                       class="rounded-lg p-2 text-ink-3 transition hover:bg-surface-2 hover:text-ink">
+                                        <x-icon name="eye" class="h-4 w-4" />
+                                    </a>
+
+                                    <x-danger-action
+                                        :action="route('patients.toggle', $patient)"
+                                        method="PATCH"
+                                        icon="refresh"
+                                        variant="subtle"
+                                        label="Ubah status aktif"
+                                        :tooltip="$patient->is_active ? 'Nonaktifkan pasien' : 'Aktifkan pasien'"
+                                        :title="$patient->is_active ? 'Nonaktifkan pasien ini?' : 'Aktifkan pasien ini?'"
+                                        :message="$patient->is_active
+                                            ? 'Pasien tidak akan muncul di pilihan pencarian sampai diaktifkan kembali.'
+                                            : 'Pasien akan muncul kembali di pilihan pencarian.'"
+                                        confirm-label="Ya, Ubah Status"
+                                        permission="patient.manage"
+                                    />
+
+                                    <a href="{{ route('patients.edit', $patient) }}" title="Ubah data"
+                                       aria-label="Ubah data {{ $patient->name }}"
+                                       class="rounded-lg p-2 text-ink-3 transition hover:bg-surface-2 hover:text-ink">
+                                        <x-icon name="pencil" class="h-4 w-4" />
+                                    </a>
+
+                                    <x-danger-action
+                                        :action="route('patients.destroy', $patient)"
+                                        :tooltip="'Hapus ' . $patient->name"
+                                        :title="'Hapus data ' . $patient->name . '?'"
+                                        :message="'Nomor rekam medis ' . $patient->mr_number . ' akan dihapus dari daftar. Pasien yang sudah punya riwayat kunjungan, rekam medis, tagihan, atau rawat inap tidak dapat dihapus.'"
+                                        permission="patient.manage"
+                                    />
+                                </div>
+                            </td>
                         </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
-                        @foreach ($patients as $patient)
-                            <tr class="hover:bg-slate-50">
-                                <td class="whitespace-nowrap px-5 py-3">
-                                    <a href="{{ route('patients.show', $patient) }}" class="font-mono text-sm font-semibold text-teal-700 hover:underline">{{ $patient->mr_number }}</a>
-                                </td>
-                                <td class="px-5 py-3">
-                                    <a href="{{ route('patients.show', $patient) }}" class="font-medium text-slate-800 hover:underline">{{ $patient->name }}</a>
-                                    @if ($patient->phone)
-                                        <p class="text-xs text-slate-500">{{ $patient->phone }}</p>
-                                    @endif
-                                </td>
-                                <td class="whitespace-nowrap px-5 py-3 font-mono text-xs text-slate-600">{{ $patient->masked_nik }}</td>
-                                <td class="whitespace-nowrap px-5 py-3 text-slate-600">{{ $patient->gender->value }} / {{ $patient->age }} th</td>
-                                <td class="px-5 py-3">
-                                    <x-badge :variant="match ($patient->insurance_type) { \App\Enums\InsuranceType::BPJS => 'teal', \App\Enums\InsuranceType::NONE => 'slate', default => 'purple' }">
-                                        {{ $patient->insurance_type->label() }}
-                                    </x-badge>
-                                </td>
-                                <td class="px-5 py-3 text-center text-slate-600">{{ $patient->registrations_count }}</td>
-                                <td class="px-5 py-3">
-                                    <x-badge :variant="$patient->is_active ? 'green' : 'red'">{{ $patient->is_active ? 'Aktif' : 'Nonaktif' }}</x-badge>
-                                </td>
-                                <td class="whitespace-nowrap px-5 py-3 text-right">
-                                    <a href="{{ route('patients.show', $patient) }}" class="text-xs font-medium text-teal-700 hover:underline">Detail</a>
-                                    @if (auth()->user()->hasPermission(\App\Enums\Permission::MANAGE_PATIENT))
-                                        <span class="mx-1 text-slate-300">|</span>
-                                        <a href="{{ route('patients.edit', $patient) }}" class="text-xs font-medium text-slate-600 hover:underline">Edit</a>
-                                    @endif
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
+                    @endforeach
+                </x-slot:body>
+            </x-data-table>
 
             @if ($patients->hasPages())
-                <div class="border-t border-slate-200 px-5 py-3">{{ $patients->links() }}</div>
+                {{ $patients->links() }}
             @endif
-        @endif
-    </x-card>
+        </x-card>
+    </div>
 @endsection

@@ -108,8 +108,10 @@ class AuthenticationTest extends TestCase
 
     public function test_navigation_only_exposes_permitted_modules(): void
     {
+        // Navigasi ada di layout aplikasi, bukan di landing page publik
+        // (pengguna yang sudah masuk dialihkan ke dashboard).
         $this->actingAs($this->userFor(RoleCode::RECEPTIONIST))
-            ->get('/')
+            ->get('/dashboard')
             ->assertOk()
             ->assertSee('Pendaftaran')
             ->assertDontSee('Pengguna');

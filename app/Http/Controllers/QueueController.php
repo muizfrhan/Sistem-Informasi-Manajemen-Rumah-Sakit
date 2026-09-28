@@ -41,7 +41,10 @@ class QueueController extends Controller
             'polies' => $polies,
             'selectedPoly' => $polyId ? $polies->firstWhere('id', $polyId) : null,
             'registrations' => $registrations,
-            'waiting' => $counts->get(RegistrationStatus::QUEUING->value, 0),
+            'counts' => $counts,
+            'statuses' => RegistrationStatus::cases(),
+            'waiting' => $counts->get(RegistrationStatus::QUEUING->value, 0)
+                + $counts->get(RegistrationStatus::REGISTERED->value, 0),
             'called' => $counts->get(RegistrationStatus::CALLED->value, 0),
             'inExamination' => $counts->get(RegistrationStatus::IN_EXAMINATION->value, 0),
             'done' => $counts->get(RegistrationStatus::DONE->value, 0),

@@ -4,15 +4,18 @@ namespace App\Models;
 
 use App\Enums\RegistrationStatus;
 use App\Enums\VisitType;
+use Database\Factories\RegistrationFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Registration extends Model
 {
-    /** @use HasFactory<\Database\Factories\RegistrationFactory> */
+    /** @use HasFactory<RegistrationFactory> */
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
@@ -67,6 +70,21 @@ class Registration extends Model
     public function registrar(): BelongsTo
     {
         return $this->belongsTo(User::class, 'registered_by');
+    }
+
+    public function medicalRecords(): HasMany
+    {
+        return $this->hasMany(MedicalRecord::class);
+    }
+
+    public function invoices(): HasMany
+    {
+        return $this->hasMany(Invoice::class);
+    }
+
+    public function admission(): HasOne
+    {
+        return $this->hasOne(InpatientAdmission::class);
     }
 
     public function scopeForToday(Builder $query): Builder

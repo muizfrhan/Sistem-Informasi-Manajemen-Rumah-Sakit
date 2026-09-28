@@ -6,11 +6,12 @@ use App\Enums\RegistrationStatus;
 use App\Models\Doctor;
 use App\Models\Patient;
 use App\Models\Poly;
+use App\Models\Registration;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 class RegistrationFactory extends Factory
 {
-    protected $model = \App\Models\Registration::class;
+    protected $model = Registration::class;
 
     public function definition(): array
     {

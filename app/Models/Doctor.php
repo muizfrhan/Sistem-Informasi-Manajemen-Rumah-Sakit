@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Database\Factories\DoctorFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -10,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Doctor extends Model
 {
-    /** @use HasFactory<\Database\Factories\DoctorFactory> */
+    /** @use HasFactory<DoctorFactory> */
     use HasFactory;
 
     protected $fillable = [
@@ -45,8 +46,26 @@ class Doctor extends Model
         return $this->hasMany(Registration::class);
     }
 
+    public function schedules(): HasMany
+    {
+        return $this->hasMany(DoctorSchedule::class);
+    }
+
+    public function medicalRecords(): HasMany
+    {
+        return $this->hasMany(MedicalRecord::class);
+    }
+
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('is_active', true);
+    }
+
+    public function scopeToday(Builder $query): Builder
+    {
+        return $query->whereHas(
+            'schedules',
+            fn (Builder $q) => $q->where('day_of_week', now()->isoWeekday())->where('is_active', true)
+        );
     }
 }

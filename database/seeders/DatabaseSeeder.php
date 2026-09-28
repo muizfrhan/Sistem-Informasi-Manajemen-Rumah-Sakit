@@ -19,7 +19,10 @@ class DatabaseSeeder extends Seeder
             Icd10Seeder::class,
             DrugSeeder::class,
             PatientSeeder::class,
+            FacilitySeeder::class,
             RegistrationSeeder::class,
+            ClinicalSeeder::class,
+            BillingSeeder::class,
         ]);
     }
 }

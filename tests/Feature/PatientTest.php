@@ -7,6 +7,7 @@ use App\Enums\Gender;
 use App\Enums\InsuranceType;
 use App\Enums\RoleCode;
 use App\Models\Patient;
+use App\Models\Registration;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -145,7 +146,7 @@ class PatientTest extends TestCase
 
     public function test_patient_with_history_cannot_be_deleted(): void
     {
-        $patient = Patient::factory()->has(\App\Models\Registration::factory()->count(1))->create();
+        $patient = Patient::factory()->has(Registration::factory()->count(1))->create();
 
         $this->actingAs($this->superAdmin())
             ->delete("/patients/{$patient->id}")

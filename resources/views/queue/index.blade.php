@@ -1,154 +1,248 @@
 @extends('layouts.app')
 
-@section('title', 'Antrean')
+@section('title', 'Papan Antrean')
 @section('heading', 'Papan Antrean')
-@section('subheading', $selectedPoly ? $selectedPoly->name.' - '.now()->translatedFormat('d F Y') : now()->translatedFormat('d F Y'))
+@section('subheading', $selectedPoly ? $selectedPoly->name : 'Semua Poli')
 
 @section('content')
-    <div class="mb-6 flex flex-wrap items-center gap-2">
-        @foreach ($polies as $poly)
-            <a href="{{ route('queue.index', ['poly_id' => $poly->id]) }}"
-               @class([
-                   'rounded-lg px-3 py-2 text-sm font-medium transition ring-1',
-                   'bg-teal-600 text-white ring-teal-600' => $selectedPoly?->id === $poly->id,
-                   'bg-white text-slate-600 ring-slate-200 hover:bg-slate-50' => $selectedPoly?->id !== $poly->id,
-               ])>
-                {{ $poly->name }}
-                <span class="ml-1 text-xs opacity-75">({{ $poly->queue_prefix }})</span>
-            </a>
-        @endforeach
-    </div>
+    <div class="space-y-5">
 
-    <div class="grid grid-cols-1 gap-6 lg:grid-cols-4">
-        <div class="lg:col-span-3">
-            <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                <x-stat-card label="Menunggu" :value="$waiting" tone="amber" icon="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                <x-stat-card label="Dipanggil" :value="$called" tone="blue" icon="M15 11a3 3 0 11-6 0 3 3 0 016 0zM19 21a7 7 0 00-14 0"/>
-                <x-stat-card label="Diperiksa" :value="$inExamination" tone="indigo" icon="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                <x-stat-card label="Selesai" :value="$done" tone="green" icon="M9 12l2 2 4-4M7.835 4.617a1.825 1.825 0 00-1.19 2.36L8 9.5m0 0l.5 2.5m0 0l2.5.5m-3 0l2.5 2.5m0-5l2.5-2.5"/>
+        <x-page-header title="Papan Antrean"
+                       description="Kelola urutan panggilan pasien per poli. Status diperbarui secara langsung.">
+            <x-slot:actions>
+                <x-button permission="registration.manage" :href="route('registrations.create')" size="sm" icon="plus">
+                    Pendaftaran
+                </x-button>
+            </x-slot:actions>
+        </x-page-header>
+
+        @if ($polies->isEmpty())
+            {{-- Tidak ada poli sama sekali: jelaskan, jangan tampilkan angka nol membingungkan. --}}
+            <x-card>
+                <x-empty-state icon="building"
+                               title="Belum ada poli terdaftar"
+                               message="Papan antrean memerlukan minimal satu poli yang aktif. Tambahkan poli terlebih dahulu.">
+                    <x-button permission="master.manage" :href="route('master.polies.create')" size="sm" icon="plus">
+                        Tambah Poli
+                    </x-button>
+                </x-empty-state>
+            </x-card>
+        @else
+            {{-- ===================== Pemilihan poli ===================== --}}
+            <div class="scroll-slim -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+                <a href="{{ route('queue.index') }}"
+                   @class([
+                       'shrink-0 rounded-lg border px-3.5 py-2 text-sm font-semibold whitespace-nowrap transition',
+                       'border-brand bg-brand text-brand-fg' => ! $selectedPoly,
+                       'border-line bg-surface text-ink-2 hover:border-line-2 hover:bg-surface-2' => $selectedPoly,
+                   ])>
+                    Semua Poli
+                </a>
+
+                @foreach ($polies as $poly)
+                    <a href="{{ route('queue.index', ['poly_id' => $poly->id]) }}"
+                       @class([
+                           'shrink-0 rounded-lg border px-3.5 py-2 text-sm font-semibold whitespace-nowrap transition',
+                           'border-brand bg-brand text-brand-fg' => $selectedPoly?->id === $poly->id,
+                           'border-line bg-surface text-ink-2 hover:border-line-2 hover:bg-surface-2' => $selectedPoly?->id !== $poly->id,
+                       ])
+                       @if ($selectedPoly?->id === $poly->id) aria-current="page" @endif>
+                        {{ $poly->name }}
+                    </a>
+                @endforeach
             </div>
 
-            <x-card class="mt-6" padding="p-0">
-                <x-slot:title>Papan Antrean {{ $selectedPoly?->name }}</x-slot:title>
-                <x-slot:subtitle>{{ now()->translatedFormat('l, d F Y') }}</x-slot:subtitle>
-                <x-slot:actions>
-                    @if ($selectedPoly && auth()->user()->hasPermission(\App\Enums\Permission::MANAGE_QUEUE))
-                        <form method="POST" action="{{ route('queue.call', $selectedPoly) }}">
-                            @csrf
-                            <x-button type="submit" size="sm">Panggil Berikutnya</x-button>
-                        </form>
-                    @endif
-                </x-slot:actions>
+            {{-- ===================== Statistik ===================== --}}
+            <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <x-stat-card label="Menunggu Panggilan" :value="$waiting" unit="pasien" tone="warning" icon="clock" compact />
+                <x-stat-card label="Dipanggil" :value="$called" unit="pasien" tone="info" icon="bell" compact />
+                <x-stat-card label="Dalam Pemeriksaan" :value="$inExamination" unit="pasien" tone="brand" icon="stethoscope" compact />
+                <x-stat-card label="Selesai" :value="$done" unit="pasien" tone="success" icon="check-circle" compact />
+            </div>
 
-                @if ($registrations->isEmpty())
-                    <x-empty-state title="Antrean kosong"
-                                   message="Belum ada pasien yang terdaftar di poli ini hari ini.">
-                        @if (auth()->user()->hasPermission(\App\Enums\Permission::MANAGE_REGISTRATION))
-                            <x-button :href="route('registrations.create')" size="sm">+ Pendaftaran Baru</x-button>
-                        @endif
-                    </x-empty-state>
-                @else
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-slate-200 text-sm">
-                            <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+            {{-- ===================== Panel.display ===================== --}}
+            <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                <div class="lg:col-span-2 space-y-4">
+                    <x-card padding="p-0"
+                            :title="'Antrean ' . ($selectedPoly?->name ?? 'Semua Poli')"
+                            :subtitle="$registrations->count() . ' pasien dalam antrean aktif'">
+                        <x-slot:actions>
+                            @if ($selectedPoly && auth()->user()->can('queue.manage'))
+                                <form method="POST" action="{{ route('queue.call', $selectedPoly) }}">
+                                    @csrf
+                                    <x-button type="submit" size="sm" icon="bell"
+                                              x-on:click.prevent="$dispatch('confirm', {
+                                                  action: $el.form.action,
+                                                  method: 'POST',
+                                                  title: 'Panggil pasien berikutnya?',
+                                                  message: 'Pasien berikutnya dalam antrean {{ $selectedPoly->name }} akan dipanggil. Pastikan petugas kehadiran sudah siap.',
+                                                  confirmLabel: 'Panggil',
+                                              })">
+                                        Panggil Berikutnya
+                                    </x-button>
+                                </form>
+                            @endif
+                        </x-slot:actions>
+
+                        <x-data-table :cols="$registrations->count()" min-width="52rem"
+                                      empty="Antrean kosong"
+                                      empty-message="Belum ada pasien yang menunggu di poli ini hari ini."
+                                      empty-icon="ticket">
+                            <x-slot:emptyAction>
+                                <x-button permission="registration.manage" :href="route('registrations.create')" size="sm" icon="plus">
+                                    Buat Pendaftaran
+                                </x-button>
+                            </x-slot:emptyAction>
+
+                            <x-slot:head>
                                 <tr>
-                                    <th class="w-24 px-5 py-3 font-medium">Antrean</th>
-                                    <th class="px-5 py-3 font-medium">Pasien</th>
-                                    <th class="px-5 py-3 font-medium">Keluhan</th>
-                                    <th class="px-5 py-3 font-medium">Status</th>
-                                    <th class="px-5 py-3 text-right font-medium">Aksi</th>
+                                    <th scope="col">Antrean</th>
+                                    <th scope="col">Pasien</th>
+                                    <th scope="col" class="hidden sm:table-cell">Poli</th>
+                                    <th scope="col" class="hidden lg:table-cell">Keluhan</th>
+                                    <th scope="col">Status</th>
+                                    <th scope="col" class="text-right">Aksi</th>
                                 </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-100">
+                            </x-slot:head>
+
+                            <x-slot:body>
                                 @foreach ($registrations as $registration)
-                                    <tr @class([
-                                        'hover:bg-slate-50',
-                                        'bg-emerald-50/60' => $registration->status === \App\Enums\RegistrationStatus::IN_EXAMINATION,
-                                    ])>
-                                        <td class="whitespace-nowrap px-5 py-3">
-                                            <span class="font-mono text-base font-bold text-slate-900">{{ $registration->queue_code }}</span>
+                                    <tr @class(['bg-danger-soft/30' => $registration->is_emergency])>
+                                        <td data-label="Antrean">
+                                            <a href="{{ route('registrations.show', $registration) }}"
+                                               class="font-mono text-sm font-bold text-brand hover:underline">
+                                                {{ $registration->queue_code }}
+                                            </a>
                                             @if ($registration->is_emergency)
-                                                <x-badge variant="red" class="mt-0.5">UGD</x-badge>
+                                                <x-badge variant="danger" class="ml-1" title="Gawat darurat">UGD</x-badge>
                                             @endif
                                         </td>
-                                        <td class="px-5 py-3">
-                                            <a href="{{ route('patients.show', $registration->patient) }}" class="font-medium text-slate-800 hover:underline">{{ $registration->patient->name }}</a>
-                                            <p class="font-mono text-xs text-slate-500">{{ $registration->patient->mr_number }} &middot; {{ $registration->patient->age }} th</p>
+
+                                        <td data-label="Pasien">
+                                            <a href="{{ route('patients.show', $registration->patient) }}"
+                                               class="font-semibold text-ink hover:underline">
+                                                {{ $registration->patient->name }}
+                                            </a>
+                                            <span class="block font-mono text-xs text-ink-3">
+                                                {{ $registration->patient->mr_number }} &middot; {{ $registration->patient->age }} th
+                                            </span>
                                         </td>
-                                        <td class="max-w-xs px-5 py-3 text-slate-600">{{ \Illuminate\Support\Str::limit($registration->complaint ?? '-', 45) }}</td>
-                                        <td class="whitespace-nowrap px-5 py-3"><x-badge :class="$registration->status->badgeClass()">{{ $registration->status->label() }}</x-badge></td>
-                                        <td class="whitespace-nowrap px-5 py-3 text-right">
-                                            @if (auth()->user()->hasPermission(\App\Enums\Permission::MANAGE_QUEUE))
-                                                <div class="flex justify-end gap-1.5">
-                                                    @if ($registration->status === \App\Enums\RegistrationStatus::REGISTERED)
-                                                        <form method="POST" action="{{ route('queue.advance', ['registration' => $registration, 'status' => \App\Enums\RegistrationStatus::QUEUING->value]) }}">
-                                                            @csrf @method('PATCH')
-                                                            <x-button type="submit" size="sm" variant="secondary">Masuk Antrean</x-button>
-                                                        </form>
-                                                    @endif
+
+                                        <td data-label="Poli" class="hidden sm:table-cell">
+                                            {{ $registration->poly->name }}
+                                        </td>
+
+                                        <td data-label="Keluhan" class="hidden lg:table-cell">
+                                            <span class="line-clamp-1 text-xs text-ink-2">
+                                                {{ $registration->complaint ?: '-' }}
+                                            </span>
+                                        </td>
+
+                                        <td data-label="Status">
+                                            <x-badge :class="$registration->status->badgeClass()">
+                                                {{ $registration->status->label() }}
+                                            </x-badge>
+                                        </td>
+
+                                        <td data-label="Aksi">
+                                            @if (auth()->user()->can('queue.manage'))
+                                                <div class="flex flex-wrap items-center justify-end gap-1.5">
                                                     @foreach ($registration->status->allowedTransitions() as $target)
-                                                        @continue($target === \App\Enums\RegistrationStatus::QUEUING)
-                                                        <form method="POST" action="{{ route('queue.advance', ['registration' => $registration, 'status' => $target->value]) }}">
-                                                            @csrf @method('PATCH')
+                                                        @php
+                                                            // Konfirmasi hanya untuk status akhir/batal.
+                                                            // Transisi maju (Dipanggil, Dalam Pemeriksaan) cukup sekali klik.
+                                                            // Payload lewat prop `confirm` supaya tidak ada kondisi Blade
+                                                            // di dalam daftar atribut <x-button>.
+                                                            $needsConfirm = in_array($target, [
+                                                                \App\Enums\RegistrationStatus::DONE,
+                                                                \App\Enums\RegistrationStatus::CANCELLED,
+                                                                \App\Enums\RegistrationStatus::NO_SHOW,
+                                                            ], true);
+
+                                                            $advanceConfirm = $needsConfirm ? [
+                                                                'action' => route('queue.advance', [$registration, $target->value]),
+                                                                'method' => 'PATCH',
+                                                                'title' => 'Ubah status menjadi '.$target->label().'?',
+                                                                'message' => 'Antrean '.$registration->queue_code.' atas nama '.$registration->patient->name
+                                                                    .' akan berstatus '.$target->label().'. Status ini tidak dapat dibatalkan.',
+                                                            ] : null;
+                                                        @endphp
+
+                                                        <form method="POST" class="inline"
+                                                              action="{{ route('queue.advance', [$registration, $target->value]) }}">
+                                                            @csrf
+                                                            @method('PATCH')
+
                                                             <x-button type="submit" size="sm"
-                                                      variant="match ($target) { \App\Enums\RegistrationStatus::DONE => 'success', \App\Enums\RegistrationStatus::CALLED => 'primary', \App\Enums\RegistrationStatus::IN_EXAMINATION => 'primary', default => 'secondary' }">
-                                                                {{ \Illuminate\Support\Str::headline($target->value) }}
+                                                                      :variant="$target === \App\Enums\RegistrationStatus::DONE ? 'primary' : 'secondary'"
+                                                                      :confirm="$advanceConfirm">
+                                                                {{ $target->label() }}
                                                             </x-button>
                                                         </form>
                                                     @endforeach
                                                 </div>
                                             @else
-                                                <span class="text-xs text-slate-400">-</span>
+                                                <span class="text-xs text-ink-3">-</span>
                                             @endif
                                         </td>
                                     </tr>
                                 @endforeach
-                            </tbody>
-                        </table>
+                            </x-slot:body>
+                        </x-data-table>
+                    </x-card>
+                </div>
+
+                {{-- ===================== Panel samping ===================== --}}
+                <div class="space-y-4">
+                    <div class="rounded-card bg-ink p-5 text-canvas shadow-e2">
+                        <p class="text-[11px] font-semibold tracking-wider uppercase opacity-70">Sedang Diperiksa</p>
+                        @if ($nowServing)
+                            <p class="mt-2 font-mono text-4xl leading-none font-bold tabular-nums">
+                                {{ $nowServing->queue_code }}
+                            </p>
+                            <p class="mt-2 text-sm font-semibold">{{ $nowServing->patient->name }}</p>
+                            <p class="mt-0.5 text-xs opacity-70">
+                                {{ $nowServing->doctor?->name ?? 'Tanpa dokter' }}
+                                @if ($nowServing->examined_at)
+                                    &middot; sejak {{ $nowServing->examined_at->format('H:i') }}
+                                @endif
+                            </p>
+                        @else
+                            <p class="mt-2 text-3xl font-bold opacity-30">--</p>
+                            <p class="mt-1 text-sm opacity-60">Tidak ada pasien dalam pemeriksaan</p>
+                        @endif
                     </div>
-                @endif
-            </x-card>
-        </div>
 
-        <div class="space-y-6">
-            <div class="rounded-xl bg-slate-900 p-5 text-white shadow-lg">
-                <p class="text-xs font-medium uppercase tracking-wide text-slate-400">Sedang Dilayani</p>
-                @if ($nowServing)
-                    <p class="mt-2 font-mono text-4xl font-bold">{{ $nowServing->queue_code }}</p>
-                    <p class="mt-1 text-sm text-slate-300">{{ $nowServing->patient->name }}</p>
-                    <p class="text-xs text-slate-500">{{ $nowServing->poly->name }}</p>
-                @else
-                    <p class="mt-2 text-3xl font-bold text-slate-600">--</p>
-                    <p class="mt-1 text-sm text-slate-500">Tidak ada pasien dalam pemeriksaan</p>
-                @endif
+                    <div class="rounded-card border border-line bg-surface p-5 shadow-e1">
+                        <p class="text-[11px] font-semibold tracking-wider text-ink-3 uppercase">Berikutnya</p>
+                        @if ($nextUp)
+                            <p class="mt-2 font-mono text-4xl leading-none font-bold text-brand tabular-nums">
+                                {{ $nextUp->queue_code }}
+                            </p>
+                            <p class="mt-2 text-sm font-semibold text-ink">{{ $nextUp->patient->name }}</p>
+                            <p class="mt-0.5 text-xs text-ink-3">{{ $nextUp->poly->name }}</p>
+                        @else
+                            <p class="mt-2 text-3xl font-bold text-ink-3/40">--</p>
+                            <p class="mt-1 text-sm text-ink-3">Tidak ada pasien menunggu</p>
+                        @endif
+                    </div>
+
+                    <x-card title="Distribusi Status" padding="p-4">
+                        @if ($registrations->isEmpty())
+                            <p class="py-2 text-center text-xs text-ink-3">Belum ada data.</p>
+                        @else
+                            <ul class="space-y-2">
+                                @foreach ($statuses as $status)
+                                    <li class="flex items-center justify-between gap-2 text-xs">
+                                        <x-badge :class="$status->badgeClass()">{{ $status->label() }}</x-badge>
+                                        <span class="font-bold text-ink tabular-nums">{{ $counts->get($status->value, 0) }}</span>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        @endif
+                    </x-card>
+                </div>
             </div>
-
-            <div class="rounded-xl bg-teal-600 p-5 text-white shadow-lg">
-                <p class="text-xs font-medium uppercase tracking-wide text-teal-100">Berikutnya</p>
-                @if ($nextUp)
-                    <p class="mt-2 font-mono text-4xl font-bold">{{ $nextUp->queue_code }}</p>
-                    <p class="mt-1 text-sm text-teal-50">{{ $nextUp->patient->name }}</p>
-                    <p class="text-xs text-teal-200">{{ $nextUp->doctor?->name ?? 'Dokter belum ditentukan' }}</p>
-                @else
-                    <p class="mt-2 text-3xl font-bold text-teal-300">--</p>
-                    <p class="mt-1 text-sm text-teal-100">Tidak ada pasien menunggu</p>
-                @endif
-            </div>
-
-            <x-card title="Distribusi Status">
-                <ul class="space-y-2 text-sm">
-                    @foreach ([
-                        \App\Enums\RegistrationStatus::REGISTERED, \App\Enums\RegistrationStatus::QUEUING,
-                        \App\Enums\RegistrationStatus::CALLED, \App\Enums\RegistrationStatus::IN_EXAMINATION,
-                        \App\Enums\RegistrationStatus::DONE,
-                    ] as $status)
-                        <li class="flex items-center justify-between gap-2">
-                            <x-badge :class="$status->badgeClass()">{{ $status->label() }}</x-badge>
-                            <span class="font-semibold text-slate-800">{{ $registrations->where('status', $status)->count() }}</span>
-                        </li>
-                    @endforeach
-                </ul>
-            </x-card>
-        </div>
+        @endif
     </div>
 @endsection

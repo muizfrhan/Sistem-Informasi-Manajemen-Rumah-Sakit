@@ -1,81 +1,110 @@
 @php
     $user = auth()->user();
-    $can = fn (string $permission) => $user?->hasPermission($permission);
-
-    $navigation = [
-        ['label' => 'Dashboard', 'route' => 'dashboard', 'icon' => 'M3 12l9-9 9 9M5 10v10a1 1 0 001 1h3a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1h3a1 1 0 001-1V10', 'permission' => 'dashboard.view', 'active' => 'dashboard'],
-        ['label' => 'Pasien', 'route' => 'patients.index', 'icon' => 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z', 'permission' => 'patient.view', 'active' => 'patients.*'],
-        ['label' => 'Pendaftaran', 'route' => 'registrations.index', 'icon' => 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4', 'permission' => 'registration.view', 'active' => 'registrations.*'],
-        ['label' => 'Antrean', 'route' => 'queue.index', 'icon' => 'M4 6h16M4 10h16M4 14h10M4 18h7', 'permission' => 'queue.manage', 'active' => 'queue.*'],
-
-        ['label' => 'Master Data', 'permission' => 'master.view', 'open' => true, 'children' => [
-            ['label' => 'Data Poli', 'route' => 'master.polies.index', 'active' => 'master.polies.*'],
-            ['label' => 'Data Dokter', 'route' => 'master.doctors.index', 'active' => 'master.doctors.*'],
-            ['label' => 'ICD-10', 'route' => 'master.icd10.index', 'active' => 'master.icd10.*'],
-            ['label' => 'Data Obat', 'route' => 'master.drugs.index', 'active' => 'master.drugs.*'],
-        ]],
-
-        ['label' => 'Permintaan Demo', 'route' => 'admin.demo-requests.index', 'icon' => 'M3 8l7.4 6.4a2 2 0 002.5 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z', 'permission' => 'reports.view', 'active' => 'admin.demo-requests.*'],
-
-        ['label' => 'Audit Trail', 'route' => 'admin.audit-logs.index', 'icon' => 'M9 17v-2m4 2v-4m4 4v-6M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z', 'permission' => 'audit.view', 'active' => 'admin.audit-logs.*', 'hiddenWithout' => true],
-
-        ['label' => 'Pengguna', 'route' => 'admin.users.index', 'icon' => 'M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6-8a4 4 0 11-4-4m7 20h-3a6 6 0 00-4 5', 'permission' => 'user.manage', 'active' => 'admin.users.*'],
-    ];
+    $navigation = \App\Support\Navigation::for($user);
 @endphp
 
-<aside id="sidebar"
-       class="fixed inset-y-0 left-0 z-40 w-72 -translate-x-full border-r border-slate-800 bg-slate-900 transition-transform lg:translate-x-0">
-    <div class="flex h-16 items-center gap-3 border-b border-slate-800 px-6">
-        <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-500 text-lg font-bold text-slate-900">S</span>
-        <div class="leading-tight">
-            <p class="text-sm font-semibold text-white">{{ config('app.name') }}</p>
-            <p class="text-[11px] text-slate-400">Hospital Information System</p>
-        </div>
-    </div>
+{{--
+    Sidebar aplikasi.
 
-    <nav class="flex-1 space-y-1 overflow-y-auto px-3 py-4" id="sidebar-nav">
-        @foreach ($navigation as $item)
-            @if (isset($item['children']))
-                @php $visibleChildren = collect($item['children'])->filter(fn ($c) => $can($item['permission'])); @endphp
-                @if ($visibleChildren->isNotEmpty() && ! ($item['hiddenWithout'] ?? false))
-                    @php $isOpen = collect($visibleChildren)->contains(fn ($c) => request()->routeIs($c['active'])); @endphp
-                    <div x-data="{ open: @js($isOpen) }" class="pt-1">
-                        <button type="button" @click="open = !open"
-                                class="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white">
-                            <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
-                            <span class="flex-1 text-left">{{ $item['label'] }}</span>
-                            <svg class="h-4 w-4 transition-transform" :class="open && 'rotate-180'" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
-                        </button>
-                        <div x-show="open" x-collapse class="ml-4 space-y-1 border-l border-slate-800 pl-3 pt-1">
-                            @foreach ($visibleChildren as $child)
-                                <a href="{{ route($child['route']) }}"
-                                   @class([
-                                       'block rounded-md px-3 py-1.5 text-sm',
-                                       'bg-teal-500/15 text-teal-300' => request()->routeIs($child['active']),
-                                       'text-slate-400 hover:bg-slate-800 hover:text-white' => ! request()->routeIs($child['active']),
-                                   ])>{{ $child['label'] }}</a>
-                            @endforeach
-                        </div>
-                    </div>
-                @endif
-            @elseif ($can($item['permission']))
-                <a href="{{ route($item['route']) }}"
-                   @class([
-                       'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition',
-                       'bg-teal-500/15 text-teal-300' => request()->routeIs($item['active']),
-                       'text-slate-300 hover:bg-slate-800 hover:text-white' => ! request()->routeIs($item['active']),
-                   ])>
-                    <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="{{ $item['icon'] }}"/>
+    Desktop : docked di kiri, selalu terlihat.
+    Mobile  : drawer geser dengan backdrop, focus trap, tombol tutup di dalam
+              drawer, dan dapat ditutup dengan Escape atau klik backdrop.
+--}}
+
+<div
+    x-data="{
+        init() {
+            // Kunci scroll body selagi drawer mobile terbuka.
+            this.$watch('$store.sidebar.open', (isOpen) => {
+                document.body.classList.toggle('overflow-hidden', isOpen);
+                if (isOpen) { this.$nextTick(() => this.$refs.closeButton?.focus()) }
+            });
+        },
+    }"
+    x-on:keydown.escape.window="$store.sidebar.close()"
+>
+    {{-- Backdrop khusus mobile --}}
+    <div
+        x-show="$store.sidebar.open"
+        x-cloak
+        x-transition:enter="transition-opacity ease-out duration-200"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="transition-opacity ease-in duration-150"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+        class="fixed inset-0 z-40 bg-slate-950/60 backdrop-blur-[2px] lg:hidden"
+        x-on:click="$store.sidebar.close()"
+        aria-hidden="true"
+    ></div>
+
+    <aside
+        class="fixed inset-y-0 left-0 z-50 flex w-[17rem] flex-col border-r border-line bg-surface
+               transition-transform duration-200 ease-out
+               -translate-x-full lg:translate-x-0"
+        x-bind:class="$store.sidebar.open && '!translate-x-0'"
+        aria-label="Navigasi utama"
+    >
+        {{-- Brand --}}
+        <div class="flex h-16 shrink-0 items-center gap-3 border-b border-line px-5">
+            <a href="{{ route('dashboard') }}" class="flex min-w-0 items-center gap-3">
+                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand text-brand-fg shadow-e1">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
                     </svg>
-                    {{ $item['label'] }}
-                </a>
-            @endif
-        @endforeach
-    </nav>
+                </span>
+                <span class="min-w-0 leading-tight">
+                    <span class="block truncate text-sm font-bold text-ink">{{ config('simrs.hospital_name') }}</span>
+                    <span class="block truncate text-[10px] font-medium tracking-wide text-ink-3 uppercase">Hospital Information System</span>
+                </span>
+            </a>
 
-    <div class="border-t border-slate-800 p-4 text-[11px] leading-relaxed text-slate-500">
-        <p><span class="text-slate-400">Peran:</span> {{ $user?->role?->name ?? '-' }}</p>
-        <p><span class="text-slate-400">Izin aktif:</span> {{ $user?->isSuperAdmin() ? 'Semua' : ($user?->permissions?->count() ?? 0) }}</p>
-    </div>
-</aside>
+            <button type="button" x-ref="closeButton" x-on:click="$store.sidebar.close()"
+                    class="-mr-1.5 ml-auto rounded-lg p-1.5 text-ink-3 transition hover:bg-surface-3 hover:text-ink lg:hidden"
+                    aria-label="Tutup menu navigasi">
+                <x-icon name="x-circle" class="h-5 w-5" />
+            </button>
+        </div>
+
+        {{-- Navigasi --}}
+        <nav class="scroll-slim flex-1 space-y-5 overflow-y-auto px-3 py-4" aria-label="Menu utama">
+            @foreach ($navigation as $group)
+                <div>
+                    <p class="px-3 pb-1.5 text-[10px] font-bold tracking-wider text-ink-3 uppercase">
+                        {{ $group['label'] }}
+                    </p>
+
+                    <ul class="space-y-0.5">
+                        @foreach ($group['items'] as $item)
+                            @php $active = request()->routeIs($item['pattern']); @endphp
+                            <li>
+                                <a href="{{ route($item['route']) }}"
+                                   @class(['nav-link', 'nav-link-active' => $active])
+                                   @if ($active) aria-current="page" @endif
+                                   x-on:click="$store.sidebar.close()">
+                                    <x-icon :name="$item['icon']" class="h-[18px] w-[18px] shrink-0" />
+                                    <span class="truncate">{{ $item['label'] }}</span>
+                                </a>
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endforeach
+        </nav>
+
+        {{-- Identitas pengguna --}}
+        <div class="shrink-0 border-t border-line p-3">
+            <a href="{{ route('profile') }}"
+               class="flex items-center gap-3 rounded-lg px-2 py-2 transition hover:bg-surface-2">
+                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-soft text-xs font-bold text-brand-ink">
+                    {{ $user?->initials }}
+                </span>
+                <span class="min-w-0 flex-1 leading-tight">
+                    <span class="block truncate text-xs font-semibold text-ink">{{ $user?->name }}</span>
+                    <span class="block truncate text-[11px] text-ink-3">{{ $user?->role?->name ?? 'Tanpa peran' }}</span>
+                </span>
+                <x-icon name="chevron-right" class="h-4 w-4 shrink-0 text-ink-3" />
+            </a>
+        </div>
+    </aside>
+</div>

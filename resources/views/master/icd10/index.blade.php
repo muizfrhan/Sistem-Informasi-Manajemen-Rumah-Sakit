@@ -4,89 +4,246 @@
 @section('heading', 'Kode ICD-10')
 @section('subheading', $codes->total().' kode diagnosis')
 
+@php
+    $search = trim((string) request('q', ''));
+    $category = trim((string) request('category', ''));
+    $hasFilter = $search !== '' || $category !== '';
+
+    $resetUrl = route('master.icd10.index');
+
+    $emptyCta = $hasFilter
+        ? ['label' => 'Reset Filter', 'href' => $resetUrl, 'variant' => 'secondary', 'icon' => 'refresh', 'permission' => null, 'click' => "location.href = '".$resetUrl."'"]
+        : ['label' => 'Tambah Kode ICD-10', 'href' => null, 'variant' => 'primary', 'icon' => 'plus', 'permission' => 'master.manage', 'click' => "\$dispatch('open-icd10')"];
+
+    $pageDescription = 'Total '.number_format($codes->total(), 0, ',', '.').' kode diagnosis'
+        .($search !== '' ? ' untuk pencarian '.$search : '');
+
+    $activeCount = $codes->getCollection()->where('is_active', true)->count();
+
+    // Nilai awal form modal diambil dari old() agar input yang gagal
+    // validasi tetap terisi kembali.
+    $icdForm = [
+        'code' => (string) old('code', ''),
+        'description' => (string) old('description', ''),
+        'category' => (string) old('category', ''),
+        'is_active' => (bool) old('is_active', true),
+        'action' => '',
+    ];
+@endphp
+
 @section('content')
-    <x-card padding="p-0">
-        <x-slot:title>Daftar Kode Diagnosis ICD-10</x-slot:title>
-        <x-slot:subtitle>Referensi diagnosis internasional (WHO ICD-10)</x-slot:subtitle>
+    <div class="space-y-5">
+        <x-page-header title="Kode ICD-10" :description="$pageDescription">
+            <x-slot:actions>
+                @if ($canManage)
+                    <x-button type="button" icon="plus" x-on:click="$dispatch('open-icd10')">
+                        Tambah Kode
+                    </x-button>
+                @endif
+            </x-slot:actions>
+        </x-page-header>
 
-        <form method="GET" class="flex flex-wrap items-end gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4">
-            <div class="min-w-56 flex-1"><x-input name="q" :value="request('q')" placeholder="Cari kode atau deskripsi..." /></div>
-            <div class="w-44"><x-select name="category" :value="request('category')" :options="$categories->all()" placeholder="Semua kategori" /></div>
-            <x-button type="submit" variant="secondary">Cari</x-button>
-            @if (request()->hasAny(['q', 'category']))
-                <a href="{{ route('master.icd10.index') }}" class="pb-2 text-xs text-slate-500 hover:text-slate-700">Reset</a>
-            @endif
-        </form>
+        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <x-stat-card label="Total Kode" :value="number_format($codes->total(), 0, ',', '.')"
+                         unit="kode" tone="brand" icon="document" compact />
+            <x-stat-card label="Kode Aktif" :value="number_format($activeCount, 0, ',', '.')"
+                         unit="kode" tone="success" icon="check-circle"
+                         hint="Tersedia untuk dipilih pada diagnosa" compact />
+            <x-stat-card label="Kategori" :value="number_format($categories->count(), 0, ',', '.')"
+                         unit="kategori" tone="info" icon="cube"
+                         hint="Kelompok bab ICD-10 yang terdaftar" compact />
+        </div>
 
-        @if ($canManage)
-            <form method="POST" action="{{ route('master.icd10.store') }}" x-data="{ open: false }" class="border-b border-slate-200 px-5 py-4">
-                @csrf
-                <button type="button" @click="open = !open" class="text-sm font-semibold text-teal-700 hover:underline">
-                    <span x-text="open ? 'Batal' : '+ Tambah Kode ICD-10'"></span>
-                </button>
-                <div x-show="open" x-collapse class="mt-4 grid grid-cols-1 gap-4 rounded-lg bg-slate-50 p-4 sm:grid-cols-4">
-                    <x-input name="code" label="Kode" required maxlength="10" placeholder="J00" />
-                    <div class="sm:col-span-2"><x-input name="description" label="Deskripsi" required maxlength="255" placeholder="Acute nasopharyngitis" /></div>
-                    <x-input name="category" label="Kategori" maxlength="10" placeholder="X" />
-                    <div class="flex items-end gap-3 sm:col-span-4">
-                        <x-checkbox name="is_active" label="Aktif" :value="true" />
-                        <x-button type="submit" size="sm">Simpan Kode</x-button>
+        <x-card padding="p-0">
+            <x-filter-bar :action="$resetUrl" :reset="$resetUrl">
+                <x-slot:fields>
+                    <div>
+                        <label for="q" class="field-label">Pencarian</label>
+                        <div class="relative">
+                            <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-ink-3">
+                                <x-icon name="search" class="h-4 w-4" />
+                            </span>
+                            <input id="q" name="q" type="search" value="{{ $search }}"
+                                   placeholder="Kode atau deskripsi diagnosis" class="field-control pl-9">
+                        </div>
                     </div>
-                </div>
-            </form>
-        @endif
 
-        @if ($codes->isEmpty())
-            <x-empty-state title="Kode ICD-10 tidak ditemukan" message="Coba kata kunci lain." />
-        @else
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-slate-200 text-sm">
-                    <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
-                        <tr>
-                            <th class="w-32 px-5 py-3 font-medium">Kode</th>
-                            <th class="px-5 py-3 font-medium">Deskripsi</th>
-                            <th class="w-24 px-5 py-3 font-medium">Kategori</th>
-                            <th class="w-24 px-5 py-3 font-medium">Status</th>
-                            @if ($canManage)<th class="w-32 px-5 py-3 text-right font-medium">Aksi</th>@endif
-                        </tr>
-                    </thead>
+                    <div>
+                        <label for="icd10_category" class="field-label">Kategori</label>
+                        <select id="icd10_category" name="category" class="field-control">
+                            <option value="">Semua kategori</option>
+                            @foreach ($categories as $cat)
+                                <option value="{{ $cat }}" @selected($category === (string) $cat)>
+                                    {{ \Illuminate\Support\Str::headline($cat) }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                </x-slot:fields>
 
+                <x-slot:default>
+                    <span class="text-xs text-ink-3">
+                        Menampilkan {{ $codes->firstItem() ?? 0 }}&ndash;{{ $codes->lastItem() ?? 0 }}
+                        dari {{ number_format($codes->total(), 0, ',', '.') }} kode
+                    </span>
+                </x-slot:default>
+            </x-filter-bar>
+
+            <x-data-table :cols="$codes->count()" min-width="52rem"
+                          empty="Kode ICD-10 tidak ditemukan"
+                          empty-message="Belum ada kode yang cocok dengan filter ini. Ubah kata kunci atau tambahkan kode diagnosis baru."
+                          empty-icon="document">
+                <x-slot:emptyAction>
+                    <x-button type="button" :href="$emptyCta['href']" :variant="$emptyCta['variant']" size="sm"
+                              :icon="$emptyCta['icon']" :permission="$emptyCta['permission']"
+                              x-on:click="{{ $emptyCta['click'] }}">
+                        {{ $emptyCta['label'] }}
+                    </x-button>
+                </x-slot:emptyAction>
+
+                <x-slot:head>
+                    <tr>
+                        <th scope="col">Kode</th>
+                        <th scope="col">Deskripsi</th>
+                        <th scope="col" class="hidden sm:table-cell">Kategori</th>
+                        <th scope="col">Status</th>
+                        <th scope="col" class="text-right">Aksi</th>
+                    </tr>
+                </x-slot:head>
+
+                <x-slot:body>
                     @foreach ($codes as $icd)
-                        <tbody x-data="{ editing: false }" class="border-t border-slate-100 hover:bg-slate-50">
-                            <tr>
-                                <td class="whitespace-nowrap px-5 py-3 font-mono text-xs font-semibold text-teal-700">{{ $icd->code }}</td>
-                                <td class="px-5 py-3 text-slate-700">{{ $icd->description }}</td>
-                                <td class="px-5 py-3 text-slate-500">{{ $icd->category ?? '-' }}</td>
-                                <td class="px-5 py-3"><x-badge :variant="$icd->is_active ? 'green' : 'red'">{{ $icd->is_active ? 'Aktif' : 'Nonaktif' }}</x-badge></td>
-                                @if ($canManage)
-                                    <td class="whitespace-nowrap px-5 py-3 text-right">
-                                        <button type="button" @click="editing = !editing" class="text-xs font-medium text-teal-700 hover:underline">Edit</button>
-                                        <span class="mx-1 text-slate-300">|</span>
-                                        <x-delete-button :action="route('master.icd10.destroy', $icd)" method="DELETE"
-                                                        :confirm="'Hapus kode ICD-10 {$icd->code}?'" label="Hapus" />
-                                    </td>
-                                @endif
-                            </tr>
-                            @if ($canManage)
-                                <tr x-show="editing" x-collapse class="border-t border-dashed border-slate-200 bg-slate-50">
-                                    <td colspan="5" class="px-5 py-3">
-                                        <form method="POST" action="{{ route('master.icd10.update', $icd) }}" class="flex flex-wrap items-end gap-3">
-                                            @csrf @method('PUT')
-                                            <div class="w-28"><x-input name="code" :value="$icd->code" required maxlength="10" /></div>
-                                            <div class="min-w-64 flex-1"><x-input name="description" :value="$icd->description" required maxlength="255" /></div>
-                                            <div class="w-24"><x-input name="category" :value="$icd->category" maxlength="10" /></div>
-                                            <x-checkbox name="is_active" label="Aktif" :value="$icd->is_active" />
-                                            <x-button type="submit" size="sm">Simpan</x-button>
-                                        </form>
-                                    </td>
-                                </tr>
-                            @endif
-                        </tbody>
-                    @endforeach
-                </table>
-            </div>
+                        <tr>
+                            <td data-label="Kode">
+                                <span class="font-mono text-xs font-bold text-brand">{{ $icd->code }}</span>
+                            </td>
 
-            @if ($codes->hasPages())<div class="border-t border-slate-200 px-5 py-3">{{ $codes->links() }}</div>@endif
-        @endif
-    </x-card>
+                            <td data-label="Deskripsi">
+                                <span class="text-ink-2">{{ $icd->description }}</span>
+                            </td>
+
+                            <td data-label="Kategori" class="hidden sm:table-cell">
+                                @if ($icd->category)
+                                    <x-badge variant="slate">
+                                        {{ \Illuminate\Support\Str::headline($icd->category) }}
+                                    </x-badge>
+                                @else
+                                    <span class="text-xs text-ink-3">-</span>
+                                @endif
+                            </td>
+
+                            <td data-label="Status">
+                                <x-active-badge :active="$icd->is_active" />
+                            </td>
+
+                            <td data-label="Aksi">
+                                @if ($canManage)
+                                    <div class="flex items-center justify-end gap-1">
+                                        <button type="button" class="btn btn-sm btn-secondary"
+                                                x-on:click="$dispatch('edit-icd10', @js([
+                                                    'id' => $icd->id,
+                                                    'code' => $icd->code,
+                                                    'description' => $icd->description,
+                                                    'category' => $icd->category,
+                                                    'is_active' => $icd->is_active,
+                                                    'action' => route('master.icd10.update', $icd),
+                                                ]))">
+                                            Ubah
+                                        </button>
+
+                                        <form method="POST" action="{{ route('master.icd10.destroy', $icd) }}" class="inline">
+                                            @csrf
+                                            @method('DELETE')
+                                            <x-button type="submit" size="sm" variant="danger" icon="trash"
+                                                      x-on:click.prevent="$dispatch('confirm', {
+                                                          action: $el.form.action,
+                                                          method: 'DELETE',
+                                                          title: 'Hapus kode ICD-10 {{ $icd->code }}?',
+                                                          message: 'Kode {{ $icd->code }} - {{ $icd->description }} akan dihapus permanen dari daftar diagnosis.',
+                                                          confirmLabel: 'Hapus Kode',
+                                                      })">
+                                                Hapus
+                                            </x-button>
+                                        </form>
+                                    </div>
+                                @else
+                                    <span class="text-xs text-ink-3">&mdash;</span>
+                                @endif
+                            </td>
+                        </tr>
+                    @endforeach
+                </x-slot:body>
+            </x-data-table>
+
+            @if ($codes->hasPages())
+                {{ $codes->links() }}
+            @endif
+        </x-card>
+    </div>
+
+    {{-- ===================== Modal tambah / ubah kode ICD-10 ===================== --}}
+    @if ($canManage)
+        <div x-data="{
+                open: false,
+                editing: false,
+                form: @js($icdForm),
+                openCreate() {
+                    this.editing = false;
+                    this.form = Object.assign({}, @js($icdForm), { action: @js(route('master.icd10.store')) });
+                    this.open = true;
+                },
+                openEdit(data) {
+                    this.editing = true;
+                    this.form = Object.assign({}, @js($icdForm), data);
+                    this.open = true;
+                },
+            }"
+             x-on:open-icd10.window="openCreate()"
+             x-on:edit-icd10.window="openEdit($event.detail)">
+
+            {{-- Judul modal tidak bisa bergantung pada state Alpine
+                 (nilai atribut komponen dihitung di sisi PHP), jadi mode
+                 formulir ditampilkan lewat badge di dalam bodi modal. --}}
+            <x-modal title="Formulir Kode ICD-10" subtitle="Referensi diagnosis internasional WHO ICD-10"
+                     icon="document" maxWidth="lg">
+                <div class="mb-4 flex items-center gap-2.5">
+                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-brand-ink">
+                        <span x-show="editing"><x-icon name="pencil" class="h-4 w-4" /></span>
+                        <span x-show="! editing" x-cloak><x-icon name="plus" class="h-4 w-4" /></span>
+                    </span>
+                    <p class="text-sm font-semibold text-ink"
+                       x-text="editing ? 'Mengubah kode diagnosis yang sudah ada' : 'Menambah kode diagnosis baru'"></p>
+                </div>
+
+                <form :action="form.action" method="POST" class="space-y-4">
+                    @csrf
+                    <template x-if="editing">
+                        <input type="hidden" name="_method" value="PUT">
+                    </template>
+
+                    <x-input name="code" label="Kode ICD-10" required :maxlength="10"
+                             placeholder="J00"
+                             x-bind:value="form.code"
+                             x-on:input="$el.value = $el.value.toUpperCase().replace(/[^A-Z0-9]/g, '')" />
+
+                    <x-textarea name="description" label="Deskripsi Diagnosis" required :rows="2" :maxlength="255"
+                                placeholder="Acute nasopharyngitis" x-bind:value="form.description" />
+
+                    <x-input name="category" label="Kategori" :maxlength="10"
+                             placeholder="J"
+                             x-bind:value="form.category"
+                             hint="Kode bab ICD-10, contoh: A sampai Z." />
+
+                    <x-checkbox name="is_active" label="Kode Aktif"
+                                hint="Kode nonaktif tidak muncul pada pilihan diagnosa."
+                                x-model="form.is_active" />
+
+                    <x-slot:footer>
+                        <button type="button" x-on:click="open = false" class="btn btn-md btn-secondary">Batal</button>
+                        <button type="submit" class="btn btn-md btn-primary" x-text="editing ? 'Simpan Perubahan' : 'Tambah Kode'"></button>
+                    </x-slot:footer>
+                </form>
+            </x-modal>
+        </div>
+    @endif
 @endsection

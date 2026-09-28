@@ -2,10 +2,15 @@
 
 namespace App\Models;
 
+use Database\Factories\Icd10CodeFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Icd10Code extends Model
 {
+    /** @use HasFactory<Icd10CodeFactory> */
+    use HasFactory;
+
     protected $table = 'icd10_codes';
 
     protected $fillable = ['code', 'description', 'category', 'is_active'];

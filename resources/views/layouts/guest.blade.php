@@ -4,15 +4,36 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <meta name="color-scheme" content="light dark">
+
     <title>@yield('title', 'Masuk') &middot; {{ config('app.name') }}</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏥</text></svg>">
+
+    <script>
+        (function () {
+            try {
+                var pref = window.localStorage.getItem('simrs-theme') || 'system';
+                var dark = pref === 'dark' || (pref === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+                document.documentElement.classList.toggle('dark', dark);
+                document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+            } catch (e) { /* abaikan */ }
+        })();
+    </script>
+
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @stack('head')
 </head>
-<body class="flex h-full items-center justify-center bg-slate-900 p-4 antialiased">
-    <div class="w-full max-w-md">
-        @include('partials.flash')
-        @yield('content')
+<body class="min-h-full bg-canvas text-ink antialiased">
+    <div class="flex min-h-full flex-col items-center justify-center px-4 py-8 sm:py-12">
+        <main class="w-full max-w-md">
+            @include('partials.flash')
+            @yield('content')
+        </main>
+
+        <p class="mt-6 text-center text-xs text-ink-3">
+            &copy; {{ now()->year }} {{ config('simrs.hospital_name') }}
+        </p>
     </div>
+
     @stack('scripts')
 </body>
 </html>

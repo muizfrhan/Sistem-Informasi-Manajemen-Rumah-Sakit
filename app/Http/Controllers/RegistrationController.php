@@ -7,6 +7,7 @@ use App\Enums\RegistrationStatus;
 use App\Models\Doctor;
 use App\Models\Patient;
 use App\Models\Poly;
+use App\Models\Registration;
 use App\Services\AuditLogger;
 use App\Services\QueueService;
 use Illuminate\Http\RedirectResponse;
@@ -25,7 +26,7 @@ class RegistrationController extends Controller
     {
         $this->denyUnless($request->user()->hasPermission(Permission::VIEW_REGISTRATION));
 
-        $registrations = \App\Models\Registration::query()
+        $registrations = Registration::query()
             ->when($request->filled('poly_id'), fn ($q) => $q->where('poly_id', $request->integer('poly_id')))
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')))
             ->when($request->filled('date'), fn ($q) => $q->whereDate('visit_date', $request->date('date')))
@@ -52,8 +53,20 @@ class RegistrationController extends Controller
             $patient = Patient::findOrFail($request->integer('patient_id'));
         }
 
+        $search = $request->string('q')->toString();
+        $matches = $patient
+            ? collect()
+            : Patient::query()
+                ->search($search)
+                ->active()
+                ->orderBy('name')
+                ->limit(10)
+                ->get();
+
         return view('registrations.create', [
             'patient' => $patient,
+            'matches' => $matches,
+            'search' => $search,
             'polies' => Poly::active()->orderBy('name')->get(),
             'doctors' => Doctor::active()->with('poly')->orderBy('name')->get(),
         ]);
@@ -99,11 +112,14 @@ class RegistrationController extends Controller
             ->with('success', "Pendaftaran berhasil. No. Antrean {$registration->queue_code} untuk {$patient->name}.");
     }
 
-    public function show(\App\Models\Registration $registration): View
+    public function show(Registration $registration): View
     {
         $this->denyUnless(auth()->user()->hasPermission(Permission::VIEW_REGISTRATION));
 
-        $registration->load(['patient', 'poly', 'doctor', 'registrar']);
+        $registration->load([
+            'patient', 'poly', 'doctor', 'registrar',
+            'medicalRecords' => fn ($q) => $q->with(['doctor', 'diagnoses.icd10Code'])->latest('id'),
+        ]);
 
         $this->audit->viewed($registration::class, $registration->id);
 

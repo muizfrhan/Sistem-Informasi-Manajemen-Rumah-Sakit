@@ -1,14 +1,14 @@
-@props(['title' => null, 'subtitle' => null, 'footer' => null, 'padding' => 'p-5'])
+@props(['title' => null, 'subtitle' => null, 'footer' => null, 'padding' => 'card-pad', 'class' => ''])
 
-<div {{ $attributes->merge(['class' => 'overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-200']) }}>
-    @if ($title || $subtitle)
-        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
-            <div>
-                @if ($title)<h3 class="text-sm font-semibold text-slate-900">{{ $title }}</h3>@endif
-                @if ($subtitle)<p class="mt-0.5 text-xs text-slate-500">{{ $subtitle }}</p>@endif
+<div {{ $attributes->merge(['class' => 'card '.$class]) }}>
+    @if ($title || $subtitle || isset($actions))
+        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-3.5">
+            <div class="min-w-0">
+                @if ($title)<h2 class="text-sm font-semibold text-ink">{{ $title }}</h2>@endif
+                @if ($subtitle)<p class="mt-0.5 text-xs text-ink-3">{{ $subtitle }}</p>@endif
             </div>
             @isset($actions)
-                <div class="flex items-center gap-2">{{ $actions }}</div>
+                <div class="flex shrink-0 flex-wrap items-center gap-2">{{ $actions }}</div>
             @endisset
         </div>
     @endif
@@ -18,6 +18,6 @@
     </div>
 
     @if ($footer)
-        <div class="border-t border-slate-200 bg-slate-50 px-5 py-3 text-xs text-slate-500">{{ $footer }}</div>
+        <div class="border-t border-line bg-surface-2 px-5 py-3 text-xs text-ink-3">{{ $footer }}</div>
     @endif
 </div>

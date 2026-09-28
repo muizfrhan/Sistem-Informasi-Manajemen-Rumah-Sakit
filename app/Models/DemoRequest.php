@@ -2,10 +2,15 @@
 
 namespace App\Models;
 
+use Database\Factories\DemoRequestFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class DemoRequest extends Model
 {
+    /** @use HasFactory<DemoRequestFactory> */
+    use HasFactory;
+
     protected $fillable = [
         'name',
         'institution',

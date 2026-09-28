@@ -1,42 +1,62 @@
-@props(['name', 'label' => null, 'value' => null, 'options' => [], 'placeholder' => 'Pilih...', 'required' => false, 'hint' => null, 'class' => '', 'disabled' => false])
+@props([
+    'name',
+    'label' => null,
+    'value' => null,
+    'options' => [],
+    'placeholder' => 'Pilih...',
+    'required' => false,
+    'hint' => null,
+    'class' => '',
+    'disabled' => false,
+])
 
 @php
     $hasError = $errors->has($name);
     $current = old($name, $value);
+    $current = $current instanceof \BackedEnum ? $current->value : $current;
+    $id = $attributes->get('id', $name);
+    $describedBy = collect([
+        $hint ? $id.'-hint' : null,
+        $hasError ? $id.'-error' : null,
+    ])->filter()->implode(' ');
 @endphp
 
 <div>
     @if ($label)
-        <label for="{{ $name }}" class="mb-1.5 block text-sm font-medium text-slate-700">
+        <label for="{{ $id }}" class="field-label">
             {{ $label }}
-            @if ($required)<span class="text-rose-500">*</span>@endif
+            @if ($required)<span class="text-danger-ink" aria-hidden="true">*</span><span class="sr-only">(wajib diisi)</span>@endif
         </label>
     @endif
 
     <select
-        id="{{ $name }}"
+        id="{{ $id }}"
         name="{{ $name }}"
         @if ($required) required @endif
         @if ($disabled) disabled @endif
+        @if ($describedBy) aria-describedby="{{ $describedBy }}" @endif
         @if ($hasError) aria-invalid="true" @endif
-        {{ $attributes->merge(['class' => 'block w-full rounded-lg border-0 px-3 py-2 text-slate-900 shadow-sm ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6 disabled:bg-slate-100 '.($hasError ? 'ring-rose-400 focus:ring-rose-500' : 'ring-slate-300 focus:ring-teal-600').' '.$class]) }}
+        {{ $attributes->except('id')->merge(['class' => 'field-control '.($hasError ? 'field-control-error' : '').' '.$class]) }}
     >
-        @if ($placeholder)
+        @if ($placeholder !== false && $placeholder !== null)
             <option value="">{{ $placeholder }}</option>
         @endif
 
         @foreach ($options as $option)
             @php
-                $optionValue = is_array($option) ? $option['value'] : $option;
-                $optionLabel = is_array($option) ? $option['label'] : $option;
+                $optionValue = is_array($option) ? ($option['value'] ?? '') : (is_object($option) && $option instanceof \BackedEnum ? $option->value : $option);
+                $optionLabel = is_array($option) ? ($option['label'] ?? $option['value'] ?? '') : (is_object($option) ? (method_exists($option, 'label') ? $option->label() : $option->name) : $option);
             @endphp
             <option value="{{ $optionValue }}" @selected((string) $current === (string) $optionValue)>{{ $optionLabel }}</option>
         @endforeach
     </select>
 
     @if ($hasError)
-        <p class="mt-1.5 text-xs text-rose-600">{{ $errors->first($name) }}</p>
+        <p id="{{ $id }}-error" class="field-error">
+            <x-icon name="exclamation" class="h-3.5 w-3.5 shrink-0" />
+            <span>{{ $errors->first($name) }}</span>
+        </p>
     @elseif ($hint)
-        <p class="mt-1.5 text-xs text-slate-500">{{ $hint }}</p>
+        <p id="{{ $id }}-hint" class="field-hint">{{ $hint }}</p>
     @endif
 </div>

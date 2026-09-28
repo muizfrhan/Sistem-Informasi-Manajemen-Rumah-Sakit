@@ -1,20 +1,54 @@
-@props(['variant' => 'primary', 'size' => 'md', 'href' => null, 'type' => 'submit'])
+@props([
+    'variant' => 'primary',
+    'size' => 'md',
+    'href' => null,
+    'type' => 'submit',
+    'icon' => null,
+    'permission' => null,
+    'confirm' => null,
+])
+
+{{--
+    Tombol dasar aplikasi.
+
+    `permission` membuat tombol hanya dirender bila pengguna berwenang.
+    Ini menggantikan pola `@can(...) <x-button>…</x-button> @endcan` di dalam
+    named slot, yang tidak dapat dikompilasi Blade dengan benar. Route
+    terkait tetap dilindungi secara terpisah di backend.
+
+    `confirm` menerima payload (action, method, title, message, confirmLabel)
+    untuk dialog konfirmasi global. Daftar atribut tombol tidak boleh
+    dibungkus kondisi Blade karena Blade tidak dapat mengompilasi direktif
+    di dalam daftar atribut sebuah tag komponen.
+
+    Komponen ini tidak membungkus komponen lain sehingga aman dipakai
+    di dalam slot mana pun.
+--}}
 
 @php
-    $base = 'inline-flex items-center justify-center gap-2 rounded-lg font-semibold transition focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60';
-    $sizes = ['sm' => 'px-2.5 py-1.5 text-xs', 'md' => 'px-3.5 py-2 text-sm', 'lg' => 'px-5 py-2.5 text-sm'];
-    $variants = [
-        'primary' => 'bg-teal-600 text-white hover:bg-teal-700 focus:ring-teal-500',
-        'secondary' => 'bg-white text-slate-700 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 focus:ring-slate-400',
-        'danger' => 'bg-rose-600 text-white hover:bg-rose-700 focus:ring-rose-500',
-        'ghost' => 'text-slate-600 hover:bg-slate-100 focus:ring-slate-400',
-        'success' => 'bg-emerald-600 text-white hover:bg-emerald-700 focus:ring-emerald-500',
-    ];
-    $classes = $base.' '.($sizes[$size] ?? $sizes['md']).' '.($variants[$variant] ?? $variants['primary']);
+    $allowed = $permission === null || auth()->user()?->can($permission);
+    $classes = 'btn btn-'.$size.' btn-'.$variant;
+    $iconMarkup = $icon !== null ? \App\Support\Icons::render($icon, 'h-4 w-4 shrink-0') : '';
+
+    $confirmAttributes = [];
+    if (is_array($confirm)) {
+        $confirmJson = json_encode(
+            $confirm,
+            JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP,
+        );
+
+        $confirmAttributes = ['x-on:click.prevent' => "\$dispatch('confirm', ".$confirmJson.')'];
+    }
 @endphp
 
-@if ($href)
-    <a href="{{ $href }}" {{ $attributes->merge(['class' => $classes]) }}>{{ $slot }}</a>
-@else
-    <button type="{{ $type }}" {{ $attributes->merge(['class' => $classes]) }}>{{ $slot }}</button>
+@if ($allowed)
+    @if ($href)
+        <a href="{{ $href }}" {{ $attributes->merge($confirmAttributes)->merge(['class' => $classes]) }}>
+            {!! $iconMarkup !!}{{ $slot }}
+        </a>
+    @else
+        <button type="{{ $type }}" {{ $attributes->merge($confirmAttributes)->merge(['class' => $classes]) }}>
+            {!! $iconMarkup !!}{{ $slot }}
+        </button>
+    @endif
 @endif

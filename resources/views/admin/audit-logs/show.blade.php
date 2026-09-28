@@ -4,73 +4,237 @@
 @section('heading', 'Detail Aktivitas')
 @section('subheading', $log->created_at?->translatedFormat('l, d F Y H:i:s'))
 
+@php
+    $eventLabels = [
+        'created' => 'Data Dibuat',
+        'updated' => 'Data Diperbarui',
+        'deleted' => 'Data Dihapus',
+        'restored' => 'Data Dipulihkan',
+        'viewed' => 'Data Dilihat',
+        'login' => 'Berhasil Masuk',
+        'login_failed' => 'Gagal Masuk',
+        'logout' => 'Keluar Sistem',
+    ];
+
+    $eventVariants = [
+        'created' => 'success',
+        'updated' => 'info',
+        'deleted' => 'danger',
+        'restored' => 'warning',
+        'viewed' => 'slate',
+        'login' => 'brand',
+        'login_failed' => 'danger',
+        'logout' => 'slate',
+    ];
+
+    // Kolom yang nilainya tidak boleh ditampilkan apa adanya. NIK pasien
+    // disimpan terenkripsi, namun salinan nilainya tetap ikut masuk ke audit
+    // log, sehingga harus disamarkan di layar.
+    $maskedKeys = ['nik', 'nik_hash', 'password', 'remember_token', 'api_token', 'payload'];
+
+    $eventLabel = $eventLabels[$log->event] ?? \Illuminate\Support\Str::headline((string) $log->event);
+    $eventVariant = $eventVariants[$log->event] ?? 'slate';
+    $changes = $log->changed_keys;
+    $changeCount = count($changes);
+    $actorName = $log->user_name ?: 'Sistem';
+    $actorRole = $log->user?->role?->name ?? '-';
+
+    /**
+     * Format satu nilai audit menjadi teks aman untuk ditampilkan.
+     */
+    $formatValue = function ($value, string $key) use ($maskedKeys) {
+        if (in_array($key, $maskedKeys, true)) {
+            if ($key === 'password' || $key === 'remember_token' || $key === 'api_token' || $key === 'payload') {
+                return '***';
+            }
+
+            return '***'.substr((string) $value, -4);
+        }
+
+        if (is_bool($value)) {
+            return $value ? 'Ya' : 'Tidak';
+        }
+
+        if ($value === null) {
+            return '(kosong)';
+        }
+
+        if (is_array($value)) {
+            $value = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        }
+
+        $value = (string) $value;
+
+        return \Illuminate\Support\Str::limit($value, 80) ?: '(kosong)';
+    };
+
+    $rawSnapshot = json_encode(
+        collect([
+            'nilai_sebelum' => collect($log->old_values ?? [])->map(fn ($v, $k) => in_array($k, $maskedKeys, true) ? '***' : $v)->all(),
+            'nilai_sesudah' => collect($log->new_values ?? [])->map(fn ($v, $k) => in_array($k, $maskedKeys, true) ? '***' : $v)->all(),
+        ]),
+        JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES,
+    );
+@endphp
+
 @section('content')
-    <a href="{{ route('admin.audit-logs.index') }}" class="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800">
-        <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
-        Kembali ke audit trail
-    </a>
+    <div class="space-y-5">
+        <x-button :href="route('admin.audit-logs.index')" variant="ghost" size="sm" icon="arrow-left">
+            Kembali ke jejak audit
+        </x-button>
 
-    <div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div class="space-y-6 lg:col-span-2">
-            <x-card title="Perubahan Nilai">
-                @php $changes = $log->changed_keys; @endphp
+        <x-page-header :title="$eventLabel"
+                       :description="$actorName.' · '.($log->created_at?->translatedFormat('d F Y H:i:s') ?? '-')">
+            <x-slot:actions>
+                <x-badge :variant="$eventVariant" dot class="px-3 py-1 text-xs">{{ $eventLabel }}</x-badge>
+            </x-slot:actions>
+        </x-page-header>
 
-                @if ($log->event === 'viewed' || $changes === [])
-                    <p class="text-sm text-slate-500">Tidak ada perubahan nilai pada aktivitas ini.</p>
-                @else
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-slate-200 text-sm">
-                            <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+        <div class="grid grid-cols-1 gap-5 lg:grid-cols-3">
+            <div class="space-y-5 lg:col-span-2">
+                <x-card title="Perubahan Nilai" subtitle="Perbandingan nilai kolom sebelum dan sesudah aktivitas" padding="p-0">
+                    @if ($changes === [])
+                        <x-empty-state compact icon="check-circle"
+                                       title="Tidak ada perubahan nilai"
+                                       message="Aktivitas ini tidak mengubah kolom apa pun pada objek yang tercatat." />
+                    @else
+                        <x-data-table :cols="$changeCount" min-width="38rem">
+                            <x-slot:head>
                                 <tr>
-                                    <th class="px-4 py-2.5 font-medium">Field</th>
-                                    <th class="px-4 py-2.5 font-medium">Sebelum</th>
-                                    <th class="px-4 py-2.5 font-medium">Sesudah</th>
+                                    <th scope="col">Kolom</th>
+                                    <th scope="col">Sebelum</th>
+                                    <th scope="col">Sesudah</th>
                                 </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-100">
+                            </x-slot:head>
+
+                            <x-slot:body>
                                 @foreach ($changes as $key)
+                                    @php
+                                        $isSensitive = in_array($key, $maskedKeys, true);
+                                        $before = $formatValue($log->old_values[$key] ?? null, $key);
+                                        $after = $formatValue($log->new_values[$key] ?? null, $key);
+                                    @endphp
                                     <tr>
-                                        <td class="whitespace-nowrap px-4 py-2.5 font-mono text-xs text-slate-600">{{ $key }}</td>
-                                        <td class="px-4 py-2.5 text-slate-500 line-through">
-                                            {{ \Illuminate\Support\Str::limit($log->old_values[$key] ?? '-', 60) }}
+                                        <td data-label="Kolom">
+                                            <span class="font-mono text-xs font-semibold text-ink">{{ $key }}</span>
+                                            @if ($isSensitive)
+                                                <span class="mt-0.5 block">
+                                                    <x-badge variant="warning">
+                                                        <x-icon name="lock" class="h-3 w-3" />
+                                                        Disamarkan
+                                                    </x-badge>
+                                                </span>
+                                            @endif
                                         </td>
-                                        <td class="px-4 py-2.5 font-medium text-slate-800">
-                                            {{ \Illuminate\Support\Str::limit($log->new_values[$key] ?? '-', 60) }}
+                                        <td data-label="Sebelum">
+                                            <span class="text-xs text-ink-3 line-through decoration-ink-3/50">
+                                                {{ $before }}
+                                            </span>
+                                        </td>
+                                        <td data-label="Sesudah">
+                                            <span class="text-xs font-semibold text-ink">{{ $after }}</span>
                                         </td>
                                     </tr>
                                 @endforeach
-                            </tbody>
-                        </table>
-                    </div>
+                            </x-slot:body>
+                        </x-data-table>
+                    @endif
+                </x-card>
+
+                @if ($log->old_values || $log->new_values)
+                    <x-card title="Salinan Data Mentah" subtitle="Rekam nilai kolom pada saat aktivitas terjadi">
+                        <pre class="scroll-slim max-h-96 overflow-auto rounded-lg bg-ink px-4 py-3 text-[11px] leading-relaxed text-canvas">{{ $rawSnapshot }}</pre>
+                        <p class="mt-2.5 flex items-start gap-1.5 text-xs text-ink-3">
+                            <x-icon name="lock" class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                            <span>Nilai sensitif seperti NIK, kata sandi, dan token ditampilkan sebagai <span class="font-mono">***</span>.</span>
+                        </p>
+                    </x-card>
                 @endif
-            </x-card>
+            </div>
 
-            <x-card title="Data Mentah" subtitle="JSON snapshot saat aktivitas terjadi">
-                <pre class="max-h-96 overflow-auto rounded-lg bg-slate-900 p-4 text-xs leading-relaxed text-slate-300">{{ json_encode(['old_values' => $log->old_values, 'new_values' => $log->new_values], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}</pre>
-            </x-card>
-        </div>
+            <div class="space-y-4">
+                <x-card title="Konteks" padding="p-0">
+                    <dl class="divide-y divide-line text-sm">
+                        <div class="px-5 py-3">
+                            <dt class="text-[11px] font-semibold tracking-wide text-ink-3 uppercase">Aktivitas</dt>
+                            <dd class="mt-1">
+                                <x-badge :variant="$eventVariant" dot>{{ $eventLabel }}</x-badge>
+                            </dd>
+                        </div>
+                        <div class="px-5 py-3">
+                            <dt class="text-[11px] font-semibold tracking-wide text-ink-3 uppercase">Objek</dt>
+                            <dd class="mt-1 font-medium text-ink">
+                                @if ($log->auditable_type)
+                                    <span class="font-mono text-xs">{{ class_basename($log->auditable_type) }}</span>
+                                    <span class="text-ink-3">#{{ $log->auditable_id }}</span>
+                                @else
+                                    <span class="text-ink-3">-</span>
+                                @endif
+                            </dd>
+                        </div>
+                        <div class="px-5 py-3">
+                            <dt class="text-[11px] font-semibold tracking-wide text-ink-3 uppercase">URL</dt>
+                            <dd class="mt-1 font-mono text-xs break-all text-ink-2">{{ $log->url ?? '-' }}</dd>
+                        </div>
+                        <div class="px-5 py-3">
+                            <dt class="text-[11px] font-semibold tracking-wide text-ink-3 uppercase">Waktu</dt>
+                            <dd class="mt-1 font-medium text-ink">
+                                {{ $log->created_at?->translatedFormat('d F Y H:i:s') ?? '-' }}
+                            </dd>
+                        </div>
+                    </dl>
+                </x-card>
 
-        <div class="space-y-6">
-            <x-card title="Konteks">
-                <dl class="space-y-3 text-sm">
-                    <div><dt class="text-xs text-slate-500">Aktivitas</dt><dd class="mt-0.5 text-slate-800">{{ ucfirst(str_replace('_', ' ', $log->event)) }}</dd></div>
-                    <div><dt class="text-xs text-slate-500">Objek</dt><dd class="mt-0.5 text-slate-800">{{ $log->auditable_type ? class_basename($log->auditable_type).' #'.$log->auditable_id : '-' }}</dd></div>
-                    <div><dt class="text-xs text-slate-500">URL</dt><dd class="mt-0.5 break-all font-mono text-xs text-slate-600">{{ $log->url ?? '-' }}</dd></div>
-                </dl>
-            </x-card>
+                <x-card title="Pelaku" padding="p-0">
+                    <dl class="divide-y divide-line text-sm">
+                        <div class="px-5 py-3">
+                            <dt class="text-[11px] font-semibold tracking-wide text-ink-3 uppercase">Pengguna</dt>
+                            <dd class="mt-1 flex items-center gap-2">
+                                @if ($log->user)
+                                    <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[10px] font-bold text-brand-ink">
+                                        {{ $log->user->initials }}
+                                    </span>
+                                    <span class="min-w-0">
+                                        <span class="block truncate font-medium text-ink">{{ $actorName }}</span>
+                                        <span class="block truncate font-mono text-[11px] text-ink-3">{{ $log->user->username }}</span>
+                                    </span>
+                                @else
+                                    <span class="font-medium text-ink">{{ $actorName }}</span>
+                                @endif
+                            </dd>
+                        </div>
+                        <div class="px-5 py-3">
+                            <dt class="text-[11px] font-semibold tracking-wide text-ink-3 uppercase">Peran Saat Aktif</dt>
+                            <dd class="mt-1 text-ink-2">{{ $actorRole }}</dd>
+                        </div>
+                        <div class="px-5 py-3">
+                            <dt class="text-[11px] font-semibold tracking-wide text-ink-3 uppercase">Hak Akses</dt>
+                            <dd class="mt-1 flex flex-wrap gap-1">
+                                @if ($log->user?->isSuperAdmin())
+                                    <x-badge variant="brand">Akses penuh</x-badge>
+                                @else
+                                    @forelse ($log->user?->permissionCodes() ?? [] as $code)
+                                        @php $enum = \App\Enums\Permission::tryFrom($code); @endphp
+                                        <x-badge variant="slate">{{ $enum?->label() ?? $code }}</x-badge>
+                                    @empty
+                                        <span class="text-xs text-ink-3">Tidak ada hak akses tercatat</span>
+                                    @endforelse
+                                @endif
+                            </dd>
+                        </div>
+                        <div class="px-5 py-3">
+                            <dt class="text-[11px] font-semibold tracking-wide text-ink-3 uppercase">IP Address</dt>
+                            <dd class="mt-1 font-mono text-xs text-ink-2">{{ $log->ip_address ?? '-' }}</dd>
+                        </div>
+                    </dl>
+                </x-card>
 
-            <x-card title="Pelaku">
-                <dl class="space-y-3 text-sm">
-                    <div><dt class="text-xs text-slate-500">Pengguna</dt><dd class="mt-0.5 text-slate-800">{{ $log->user_name ?? 'Sistem' }}</dd></div>
-                    <div><dt class="text-xs text-slate-500">Peran</dt><dd class="mt-0.5 text-slate-800">{{ $log->user?->role?->name ?? '-' }}</dd></div>
-                    <div><dt class="text-xs text-slate-500">IP Address</dt><dd class="mt-0.5 font-mono text-xs text-slate-600">{{ $log->ip_address ?? '-' }}</dd></div>
-                    <div><dt class="text-xs text-slate-500">Waktu</dt><dd class="mt-0.5 text-slate-800">{{ $log->created_at?->translatedFormat('d F Y H:i:s') }}</dd></div>
-                </dl>
-            </x-card>
-
-            <x-card title="User Agent">
-                <p class="break-all font-mono text-[11px] leading-relaxed text-slate-500">{{ $log->user_agent ?? '-' }}</p>
-            </x-card>
+                <x-card title="Perangkat Pengguna">
+                    <p class="font-mono text-[11px] leading-relaxed break-all text-ink-2">
+                        {{ $log->user_agent ?? 'Perangkat tidak tercatat' }}
+                    </p>
+                </x-card>
+            </div>
         </div>
     </div>
 @endsection

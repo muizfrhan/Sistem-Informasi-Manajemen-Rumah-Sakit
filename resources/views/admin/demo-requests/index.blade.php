@@ -4,132 +4,316 @@
 @section('heading', 'Permintaan Demo')
 @section('subheading', $leads->total().' calon klien dari halaman landing')
 
+@php
+    $hasFilter = $search !== '' || $status !== '' || $facilityType !== '';
+    $resetUrl = route('admin.demo-requests.index');
+
+    $statusOptions = [
+        'NEW' => 'Baru',
+        'CONTACTED' => 'Sudah Dihubungi',
+        'DEMO_SCHEDULED' => 'Demo Dijadwalkan',
+        'WON' => 'Menjadi Klien',
+        'LOST' => 'Belum Tertarik',
+    ];
+
+    $statusVariants = [
+        'NEW' => 'brand',
+        'CONTACTED' => 'info',
+        'DEMO_SCHEDULED' => 'warning',
+        'WON' => 'success',
+        'LOST' => 'slate',
+    ];
+
+    $pageDescription = 'Total '.number_format($leads->total(), 0, ',', '.').' permintaan'
+        .($search !== '' ? ' untuk pencarian '.$search : '');
+
+    $emptyCta = $hasFilter
+        ? ['label' => 'Reset Filter', 'href' => $resetUrl, 'variant' => 'secondary', 'icon' => 'refresh']
+        : ['label' => 'Belum ada permintaan', 'href' => null, 'variant' => 'secondary', 'icon' => 'inbox'];
+@endphp
+
 @section('content')
-    <div class="mb-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        @foreach ([
-            ['Baru', $counts->get('NEW', 0), 'teal', 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z'],
-            ['Sudah dihubungi', $counts->get('CONTACTED', 0), 'blue', 'M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5zM7 9h10M7 13h6'],
-            ['Demo dijadwalkan', $counts->get('DEMO_SCHEDULED', 0), 'amber', 'M8 7V3m8 4V3M4 11h16M5 5h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V6a1 1 0 011-1z'],
-            ['Menjadi klien', $counts->get('WON', 0), 'green', 'M5 13l4 4L19 7'],
-        ] as $stat)
-            <x-stat-card :label="$stat[0]" :value="$stat[1]" :icon="$stat[3]" :tone="$stat[2]" />
-        @endforeach
+    <div class="space-y-5">
+        <x-page-header title="Permintaan Demo" :description="$pageDescription" />
+
+        <div class="grid grid-cols-2 gap-3 lg:grid-cols-5">
+            <x-stat-card label="Total Permintaan" :value="number_format($leads->total(), 0, ',', '.')"
+                         unit="permintaan" tone="slate" icon="inbox" compact />
+            <x-stat-card label="Baru" :value="number_format($counts->get('NEW', 0), 0, ',', '.')"
+                         unit="permintaan" tone="brand" icon="bell" compact />
+            <x-stat-card label="Sudah Dihubungi" :value="number_format($counts->get('CONTACTED', 0), 0, ',', '.')"
+                         unit="permintaan" tone="info" icon="phone" compact />
+            <x-stat-card label="Demo Dijadwalkan" :value="number_format($counts->get('DEMO_SCHEDULED', 0), 0, ',', '.')"
+                         unit="permintaan" tone="warning" icon="calendar" compact />
+            <x-stat-card label="Menjadi Klien" :value="number_format($counts->get('WON', 0), 0, ',', '.')"
+                         unit="permintaan" tone="success" icon="check-circle" compact />
+        </div>
+
+        <x-card padding="p-0">
+            <x-slot:title>Daftar Permintaan</x-slot:title>
+            <x-slot:subtitle>Data diisi melalui formulir jadwalkan demo pada halaman landing</x-slot:subtitle>
+
+            <x-filter-bar :action="$resetUrl" :reset="$resetUrl">
+                <x-slot:fields>
+                    <div>
+                        <label for="lead_q" class="field-label">Pencarian</label>
+                        <div class="relative">
+                            <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-ink-3">
+                                <x-icon name="search" class="h-4 w-4" />
+                            </span>
+                            <input id="lead_q" name="q" type="search" value="{{ $search }}"
+                                   placeholder="Nama, instansi, atau email" class="field-control pl-9">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="lead_status" class="field-label">Status</label>
+                        <select id="lead_status" name="status" class="field-control">
+                            <option value="">Semua status</option>
+                            @foreach ($statusOptions as $value => $label)
+                                <option value="{{ $value }}" @selected($status === $value)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div>
+                        <label for="lead_facility_type" class="field-label">Jenis Fasilitas</label>
+                        <select id="lead_facility_type" name="facility_type" class="field-control">
+                            <option value="">Semua jenis</option>
+                            <option value="HOSPITAL" @selected($facilityType === 'HOSPITAL')>Rumah Sakit</option>
+                            <option value="CLINIC" @selected($facilityType === 'CLINIC')>Klinik</option>
+                            <option value="PRIVATE_PRACTICE" @selected($facilityType === 'PRIVATE_PRACTICE')>Praktik Mandiri</option>
+                            <option value="OTHER" @selected($facilityType === 'OTHER')>Lainnya</option>
+                        </select>
+                    </div>
+                </x-slot:fields>
+
+                <x-slot:default>
+                    <span class="text-xs text-ink-3">
+                        Menampilkan {{ $leads->firstItem() ?? 0 }}&ndash;{{ $leads->lastItem() ?? 0 }}
+                        dari {{ number_format($leads->total(), 0, ',', '.') }} permintaan
+                    </span>
+                </x-slot:default>
+            </x-filter-bar>
+
+            <x-data-table :cols="$leads->count()" min-width="68rem"
+                          empty="Belum ada permintaan demo"
+                          empty-message="Permintaan akan muncul di sini setelah calon klien mengisi formulir pada halaman landing."
+                          empty-icon="inbox">
+                <x-slot:emptyAction>
+                    <x-button type="button" :href="$emptyCta['href']" :variant="$emptyCta['variant']" size="sm"
+                              :icon="$emptyCta['icon']" x-on:click="location.href = '{{ $resetUrl }}'">
+                        {{ $emptyCta['label'] }}
+                    </x-button>
+                </x-slot:emptyAction>
+
+                <x-slot:head>
+                    <tr>
+                        <th scope="col" class="hidden sm:table-cell">Tanggal</th>
+                        <th scope="col">Instansi</th>
+                        <th scope="col">Calon Klien</th>
+                        <th scope="col" class="hidden lg:table-cell">Kontak</th>
+                        <th scope="col" class="hidden xl:table-cell">Kebutuhan</th>
+                        <th scope="col">Status</th>
+                        <th scope="col" class="text-right">Aksi</th>
+                    </tr>
+                </x-slot:head>
+
+                <x-slot:body>
+                    @foreach ($leads as $lead)
+                        @php
+                            $email = $lead->email ?: null;
+                            $phoneDigits = preg_replace('/\D/', '', (string) $lead->phone);
+                            $phoneDigits = $phoneDigits !== '' ? $phoneDigits : null;
+                            $note = (string) ($lead->internal_note ?? '');
+                        @endphp
+
+                        <tr>
+                            <td data-label="Tanggal" class="hidden sm:table-cell">
+                                <span class="text-xs text-ink-2 tabular-nums">
+                                    {{ $lead->created_at?->translatedFormat('d M Y H:i') }}
+                                </span>
+                            </td>
+
+                            <td data-label="Instansi">
+                                <span class="font-semibold text-ink">{{ $lead->institution }}</span>
+                                <span class="mt-0.5 block text-xs text-ink-3">
+                                    {{ $lead->facilityTypeLabel() }}@if ($lead->bed_count) &middot; {{ $lead->bed_count }} TT @endif
+                                </span>
+                                <span class="mt-0.5 block text-xs text-ink-3 sm:hidden">
+                                    {{ $lead->created_at?->translatedFormat('d M Y') }}
+                                </span>
+                            </td>
+
+                            <td data-label="Calon Klien">
+                                <span class="text-sm font-medium text-ink">{{ $lead->name }}</span>
+                                <span class="mt-0.5 block text-xs text-ink-3">{{ $lead->position ?: 'Tanpa jabatan' }}</span>
+                            </td>
+
+                            <td data-label="Kontak" class="hidden lg:table-cell">
+                                @if ($email)
+                                    <a href="mailto:{{ $email }}" class="text-xs font-medium text-brand hover:underline">
+                                        {{ $email }}
+                                    </a>
+                                @else
+                                    <span class="text-xs text-ink-3">Tanpa email</span>
+                                @endif
+
+                                @if ($phoneDigits)
+                                    <a href="https://wa.me/{{ $phoneDigits }}" target="_blank" rel="noopener noreferrer"
+                                       class="mt-0.5 flex items-center gap-1 text-xs text-ink-2 hover:underline">
+                                        <x-icon name="phone" class="h-3 w-3" />
+                                        {{ $lead->phone }}
+                                    </a>
+                                @else
+                                    <span class="mt-0.5 block text-xs text-ink-3">Tanpa nomor telepon</span>
+                                @endif
+                            </td>
+
+                            <td data-label="Kebutuhan" class="hidden xl:table-cell">
+                                <span class="line-clamp-2 text-xs text-ink-2">
+                                    {{ \Illuminate\Support\Str::limit((string) ($lead->message ?? ''), 90) ?: 'Tidak ada keterangan' }}
+                                </span>
+                            </td>
+
+                            <td data-label="Status">
+                                <x-badge :variant="$statusVariants[$lead->status] ?? 'slate'" dot>
+                                    {{ $lead->statusLabel() }}
+                                </x-badge>
+                                @if ($note !== '')
+                                    <span class="mt-0.5 block text-[11px] text-ink-3">Ada catatan internal</span>
+                                @endif
+                            </td>
+
+                            <td data-label="Aksi">
+                                <div class="flex flex-wrap items-center justify-end gap-1">
+                                    <button type="button" class="btn btn-sm btn-secondary"
+                                            x-on:click="$dispatch('manage-lead', @js([
+                                                'id' => $lead->id,
+                                                'institution' => $lead->institution,
+                                                'name' => $lead->name,
+                                                'status' => $lead->status,
+                                                'internal_note' => $note,
+                                                'action' => route('admin.demo-requests.update', $lead),
+                                                'delete_action' => route('admin.demo-requests.destroy', $lead),
+                                            ]))">
+                                        Kelola
+                                    </button>
+
+                                    {{-- Formulir hapus berada di luar sel tabel agar
+                                         tidak pernah menjadi anak langsung <tbody>. --}}
+                                    <form method="POST" action="{{ route('admin.demo-requests.destroy', $lead) }}" class="inline">
+                                        @csrf
+                                        @method('DELETE')
+                                        <x-button type="submit" size="sm" variant="danger" icon="trash"
+                                                  x-on:click.prevent="$dispatch('confirm', {
+                                                      action: $el.form.action,
+                                                      method: 'DELETE',
+                                                      title: 'Hapus permintaan {{ $lead->institution }}?',
+                                                      message: 'Permintaan demo dari {{ $lead->name }} akan dihapus permanen beserta catatan internalnya.',
+                                                      confirmLabel: 'Hapus Permintaan',
+                                                  })">
+                                            Hapus
+                                        </x-button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    @endforeach
+                </x-slot:body>
+            </x-data-table>
+
+            @if ($leads->hasPages())
+                {{ $leads->links() }}
+            @endif
+        </x-card>
     </div>
 
-    <x-card padding="p-0">
-        <x-slot:title>Daftar Permintaan</x-slot:title>
-        <x-slot:subtitle>Data diisi melalui formulir "Jadwalkan Demo" pada halaman landing</x-slot:subtitle>
+    {{-- ===================== Modal kelola permintaan ===================== --}}
+    <div x-data="{
+            open: false,
+            form: {
+                id: null,
+                institution: '',
+                name: '',
+                status: 'NEW',
+                internal_note: '',
+                action: '',
+                delete_action: '',
+            },
+            openManage(data) {
+                this.form = data;
+                this.open = true;
+            },
+         }"
+         x-on:manage-lead.window="openManage($event.detail)">
 
-        <form method="GET" class="grid grid-cols-1 gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div><x-input name="q" :value="$search" placeholder="Nama / instansi / email..." /></div>
-            <div>
-                <x-select name="status" :value="$status" :options="collect(['NEW', 'CONTACTED', 'DEMO_SCHEDULED', 'WON', 'LOST'])->mapWithKeys(fn ($s) => [$s => ucfirst(strtolower(str_replace('_', ' ', $s)))])->all()" placeholder="Semua status" />
+        <x-modal title="Kelola Permintaan Demo" subtitle="Perbarui status tindak lanjut dan catatan internal"
+                 icon="clipboard" maxWidth="lg">
+            <div class="space-y-4">
+                <dl class="grid grid-cols-1 gap-3 rounded-lg bg-surface-2 p-3.5 text-sm sm:grid-cols-2">
+                    <div>
+                        <dt class="text-[11px] font-semibold tracking-wide text-ink-3 uppercase">Instansi</dt>
+                        <dd class="mt-0.5 font-semibold text-ink" x-text="form.institution"></dd>
+                    </div>
+                    <div>
+                        <dt class="text-[11px] font-semibold tracking-wide text-ink-3 uppercase">Calon Klien</dt>
+                        <dd class="mt-0.5 font-medium text-ink" x-text="form.name"></dd>
+                    </div>
+                </dl>
+
+                {{-- Formulir pembaruan dan formulir hapus sengaja dipisah agar
+                     tidak ada form yang bersarang. --}}
+                <form :action="form.action" method="POST" class="space-y-4">
+                    @csrf
+                    @method('PATCH')
+
+                    <div>
+                        <label for="lead_modal_status" class="field-label">
+                            Status Tindak Lanjut <span class="text-danger-ink" aria-hidden="true">*</span>
+                        </label>
+                        <select id="lead_modal_status" name="status" required x-model="form.status" class="field-control">
+                            @foreach ($statusOptions as $value => $label)
+                                <option value="{{ $value }}">{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div>
+                        <label for="lead_modal_note" class="field-label">Catatan Internal</label>
+                        <textarea id="lead_modal_note" name="internal_note" rows="4" maxlength="2000"
+                                  class="field-control resize-y"
+                                  placeholder="Riwayat komunikasi, hasil percakapan, atau tindak lanjut berikutnya."
+                                  x-model="form.internal_note"></textarea>
+                        <p class="field-hint">
+                            Hanya terlihat oleh pengelola, maksimal 2.000 karakter.
+                        </p>
+                    </div>
+
+                    <x-slot:footer>
+                        <button type="button" x-on:click="open = false" class="btn btn-md btn-secondary">Batal</button>
+                        <button type="submit" class="btn btn-md btn-primary">Simpan Perubahan</button>
+                    </x-slot:footer>
+                </form>
+
+                <form :action="form.delete_action" method="POST" class="border-t border-line pt-4">
+                    @csrf
+                    @method('DELETE')
+                    <p class="mb-2.5 text-xs text-ink-3">
+                        Menghapus permintaan akan menghilangkan catatan internal secara permanen.
+                    </p>
+                    <x-button type="submit" size="sm" variant="danger" icon="trash"
+                              x-on:click.prevent="$dispatch('confirm', {
+                                  action: $el.form.action,
+                                  method: 'DELETE',
+                                  title: 'Hapus permintaan demo ini?',
+                                  message: 'Permintaan beserta catatan internalnya akan dihapus permanen.',
+                                  confirmLabel: 'Hapus Permintaan',
+                              })">
+                        Hapus Permintaan
+                    </x-button>
+                </form>
             </div>
-            <div>
-                <x-select name="facility_type" :value="$facilityType" :options="['HOSPITAL' => 'Rumah Sakit', 'CLINIC' => 'Klinik', 'PRIVATE_PRACTICE' => 'Praktik Mandiri', 'OTHER' => 'Lainnya']" placeholder="Semua jenis" />
-            </div>
-            <div class="flex items-center gap-2">
-                <x-button type="submit" variant="secondary">Filter</x-button>
-                @if (request()->hasAny(['q', 'status', 'facility_type']))
-                    <a href="{{ route('admin.demo-requests.index') }}" class="text-xs text-slate-500 hover:text-slate-700">Reset</a>
-                @endif
-            </div>
-        </form>
-
-        @if ($leads->isEmpty())
-            <x-empty-state title="Belum ada permintaan demo"
-                           message="Permintaan akan muncul di sini setelah calon klien mengisi formulir pada halaman landing."
-                           icon="M3 8l7.4 6.4a2 2 0 002.5 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-        @else
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-slate-200 text-sm">
-                    <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
-                        <tr>
-                            <th class="px-5 py-3 font-medium">Tanggal</th>
-                            <th class="px-5 py-3 font-medium">Calon Klien</th>
-                            <th class="px-5 py-3 font-medium">Fasilitas</th>
-                            <th class="px-5 py-3 font-medium">Kontak</th>
-                            <th class="px-5 py-3 font-medium">Kebutuhan</th>
-                            <th class="px-5 py-3 font-medium">Status</th>
-                            <th class="px-5 py-3 text-right font-medium">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
-                        @foreach ($leads as $lead)
-                            <tr class="align-top hover:bg-slate-50">
-                                <td class="whitespace-nowrap px-5 py-3 text-xs text-slate-500">{{ $lead->created_at?->translatedFormat('d M Y H:i') }}</td>
-                                <td class="px-5 py-3">
-                                    <p class="font-medium text-slate-800">{{ $lead->name }}</p>
-                                    <p class="text-xs text-slate-500">{{ $lead->position ?: '-' }}</p>
-                                </td>
-                                <td class="px-5 py-3">
-                                    <p class="text-slate-800">{{ $lead->institution }}</p>
-                                    <p class="text-xs text-slate-500">
-                                        {{ $lead->facilityTypeLabel() }}@if ($lead->bed_count) &middot; {{ $lead->bed_count }} TT @endif
-                                    </p>
-                                </td>
-                                <td class="px-5 py-3 text-xs">
-                                    <a href="mailto:{{ $lead->email }}" class="block text-blue-700 hover:underline">{{ $lead->email }}</a>
-                                    <a href="https://wa.me/{{ preg_replace('/\D/', '', $lead->phone) }}" target="_blank" rel="noopener" class="text-slate-600 hover:underline">{{ $lead->phone }}</a>
-                                </td>
-                                <td class="max-w-xs px-5 py-3 text-xs text-slate-600">{{ \Illuminate\Support\Str::limit($lead->message, 90) ?: '-' }}</td>
-                                <td class="px-5 py-3">
-                                    <x-badge :variant="match ($lead->status) { 'NEW' => 'teal', 'CONTACTED' => 'blue', 'DEMO_SCHEDULED' => 'amber', 'WON' => 'green', default => 'slate' }">
-                                        {{ $lead->statusLabel() }}
-                                    </x-badge>
-                                </td>
-                                <td class="px-5 py-3 text-right">
-                                    <div x-data="{ open: false }" class="relative inline-block text-left">
-                                        <button type="button" @click="open = !open"
-                                                class="rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50">
-                                            Kelola
-                                        </button>
-
-                                        <div x-show="open" x-transition @click.outside="open = false"
-                                             class="absolute right-0 z-20 mt-2 w-72 rounded-xl bg-white p-4 text-left shadow-lg ring-1 ring-slate-200">
-                                            <form method="POST" action="{{ route('admin.demo-requests.update', $lead) }}" class="space-y-3">
-                                                @csrf
-                                                @method('PATCH')
-
-                                                <div>
-                                                    <label class="mb-1 block text-xs font-medium text-slate-600">Status</label>
-                                                    <select name="status"
-                                                            class="block w-full rounded-lg border-0 px-2.5 py-1.5 text-xs ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-teal-600">
-                                                        @foreach (['NEW', 'CONTACTED', 'DEMO_SCHEDULED', 'WON', 'LOST'] as $status)
-                                                            <option value="{{ $status }}" @selected($lead->status === $status)>
-                                                                {{ ucfirst(strtolower(str_replace('_', ' ', $status))) }}
-                                                            </option>
-                                                        @endforeach
-                                                    </select>
-                                                </div>
-
-                                                <div>
-                                                    <label class="mb-1 block text-xs font-medium text-slate-600">Catatan internal</label>
-                                                    <textarea name="internal_note" rows="3" class="block w-full rounded-lg border-0 px-2.5 py-1.5 text-xs ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-teal-600">{{ $lead->internal_note }}</textarea>
-                                                </div>
-
-                                                <div class="flex items-center justify-between gap-2">
-                                                    <x-button type="submit" size="sm">Simpan</x-button>
-                                                    <x-button type="submit" size="sm" variant="danger"
-                                                             form="delete-lead-{{ $lead->id }}"
-                                                             onclick="return confirm('Hapus permintaan ini?')">Hapus</x-button>
-                                                </div>
-                                            </form>
-                                        </div>
-                                    </div>
-                                </td>
-                            </tr>
-
-                            <form id="delete-lead-{{ $lead->id }}" method="POST" action="{{ route('admin.demo-requests.destroy', $lead) }}" class="hidden">
-                                @csrf
-                                @method('DELETE')
-                            </form>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-
-            @if ($leads->hasPages())<div class="border-t border-slate-200 px-5 py-3">{{ $leads->links() }}</div>@endif
-        @endif
-    </x-card>
+        </x-modal>
+    </div>
 @endsection

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\Permission as PermissionCode;
 use App\Enums\RoleCode;
+use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -14,7 +15,7 @@ use Illuminate\Support\Collection;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
+    /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable, SoftDeletes;
 
     protected $fillable = [
@@ -59,6 +60,7 @@ class User extends Authenticatable
     {
         return $this->belongsToMany(Permission::class, 'permission_role', 'role_id', 'permission_id');
     }
+
     public function getRoleCodeAttribute(): ?string
     {
         return $this->role?->code;

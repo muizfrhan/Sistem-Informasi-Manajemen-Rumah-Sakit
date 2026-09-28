@@ -2,7 +2,6 @@
 
 namespace App\Observers;
 
-use App\Models\Patient;
 use App\Services\AuditLogger;
 use Illuminate\Database\Eloquent\Model;
 

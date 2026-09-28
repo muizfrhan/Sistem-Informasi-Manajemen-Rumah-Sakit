@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use App\Enums\Gender;
-use App\Enums\InsuranceType;
 use App\Services\PatientService;
 use Illuminate\Database\Seeder;
 
@@ -11,6 +10,12 @@ class PatientSeeder extends Seeder
 {
     public function run(): void
     {
+        // Seeder harus aman dijalankan berulang: NIK bersifat unik, sehingga
+        // pasien yang sudah terdaftar dilewati.
+        if (Patient::query()->exists()) {
+            return;
+        }
+
         $patients = [
             ['Budi Santoso', '3201234567890001', Gender::MALE, '1990-05-14', 'Bandung', 'O', '081234567890', 'NONE', null, null, 'Jl. Merdeka No. 12, Bandung'],
             ['Siti Aminah', '3201234567890002', Gender::FEMALE, '1985-11-02', 'Bandung', 'A', '081234567891', 'BPJS', '0001234567890', 'BPJS Kesehatan', 'Jl. Sudirman No. 45, Bandung'],
